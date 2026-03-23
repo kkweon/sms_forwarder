@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:another_telephony/telephony.dart';
@@ -39,23 +40,50 @@ Future<void> backgroundMessageHandler(SmsMessage message) async {
   debugPrint('[SMS] BG: forwarding to $numbers');
   final telephony = Telephony.backgroundInstance;
   final forwardText = 'Fwd from ${message.address ?? "unknown"}:\n$body';
+  final now = DateTime.now().toIso8601String();
+  final from = message.address ?? 'unknown';
+  final pendingEntries = <String, String>{};
+  final completers = <String, Completer<void>>{};
+
   for (final number in numbers) {
+    final completer = Completer<void>();
+    completers[number] = completer;
     await telephony.sendSms(
       to: number,
       message: forwardText,
       isMultipart: true,
       statusListener: (SendStatus status) {
         debugPrint('[SMS] BG: send to $number status=$status');
+        pendingEntries[number] = jsonEncode({
+          'time': now,
+          'from': from,
+          'to': number,
+          'body': body,
+          'status': status == SendStatus.SENT ? 'sent' : 'failed',
+        });
+        if (!completer.isCompleted) completer.complete();
       },
     );
   }
+
+  await Future.wait(completers.entries.map((e) => e.value.future.timeout(
+    const Duration(seconds: 30),
+    onTimeout: () {
+      debugPrint('[SMS] BG: timeout waiting for status from ${e.key}');
+      pendingEntries[e.key] = jsonEncode({
+        'time': now,
+        'from': from,
+        'to': e.key,
+        'body': body,
+        'status': 'timeout',
+      });
+    },
+  )));
   final log = prefs.getStringList('forwarding_log') ?? [];
-  log.insert(0, jsonEncode({
-    'time': DateTime.now().toIso8601String(),
-    'from': message.address ?? 'unknown',
-    'body': body,
-  }));
-  if (log.length > 50) log.removeLast();
+  for (final entry in pendingEntries.values) {
+    log.insert(0, entry);
+  }
+  if (log.length > 50) log.removeRange(50, log.length);
   await prefs.setStringList('forwarding_log', log);
 }
 
@@ -168,26 +196,55 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> {
     }
     debugPrint('[SMS] FG: forwarding to $_destinationNumbers');
     final forwardText = 'Fwd from ${message.address ?? "unknown"}:\n$body';
+    final now = DateTime.now().toIso8601String();
+    final from = message.address ?? 'unknown';
+    final pendingEntries = <String, Map<String, String>>{};
+    final completers = <String, Completer<void>>{};
+
     for (final number in _destinationNumbers) {
+      final completer = Completer<void>();
+      completers[number] = completer;
       _telephony.sendSms(
         to: number,
         message: forwardText,
         isMultipart: true,
         statusListener: (SendStatus status) {
           debugPrint('[SMS] FG: send to $number status=$status');
+          pendingEntries[number] = {
+            'time': now,
+            'from': from,
+            'to': number,
+            'body': body,
+            'status': status == SendStatus.SENT ? 'sent' : 'failed',
+          };
+          if (!completer.isCompleted) completer.complete();
         },
       );
     }
-    final entry = {
-      'time': DateTime.now().toIso8601String(),
-      'from': message.address ?? 'unknown',
-      'body': body,
-    };
-    setState(() {
-      _forwardingLog.insert(0, entry);
-      if (_forwardingLog.length > 50) _forwardingLog.removeLast();
+
+    Future.wait(completers.entries.map((e) => e.value.future.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        debugPrint('[SMS] FG: timeout waiting for status from ${e.key}');
+        pendingEntries[e.key] = {
+          'time': now,
+          'from': from,
+          'to': e.key,
+          'body': body,
+          'status': 'timeout',
+        };
+      },
+    ))).then((_) {
+      setState(() {
+        for (final entry in pendingEntries.values) {
+          _forwardingLog.insert(0, entry);
+        }
+        if (_forwardingLog.length > 50) {
+          _forwardingLog.removeRange(50, _forwardingLog.length);
+        }
+      });
+      _saveLog();
     });
-    _saveLog();
   }
 
   Future<void> _saveForwardingEnabled(bool value) async {
@@ -401,9 +458,15 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> {
                       _forwardingLog.length,
                       (i) {
                         final entry = _forwardingLog[i];
+                        final failed = entry['status'] != 'sent';
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text('From: ${entry['from']}'),
+                          leading: Icon(
+                            failed ? Icons.error_outline : Icons.check_circle_outline,
+                            color: failed ? Colors.red : Colors.green,
+                            size: 20,
+                          ),
+                          title: Text('From: ${entry['from']}  →  ${entry['to'] ?? '?'}'),
                           subtitle: Text(
                             entry['body'] as String,
                             maxLines: 2,

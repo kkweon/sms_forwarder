@@ -6,9 +6,31 @@ A personal Android app that automatically forwards SMS messages containing verif
 
 ### 1. Build & install APK
 
+Build split APKs (smaller per-ABI binaries):
+
 ```bash
-flutter build apk --release
-adb install build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --split-per-abi --release
+```
+
+Outputs:
+- `build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk` (~14.6MB)
+- `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`   (~17.2MB)
+- `build/app/outputs/flutter-apk/app-x86_64-release.apk`      (~18.6MB)
+
+Install the APK matching your device's ABI (check `flutter devices` for the architecture):
+
+```bash
+flutter install \
+  --device-id <YOUR-DEVICE-ID> \
+  --use-application-binary=build/app/outputs/flutter-apk/app-<ABI>-release.apk
+```
+
+Example for Pixel 7 Pro (arm64):
+
+```bash
+flutter install \
+  --device-id 2B141FDH300F4B \
+  --use-application-binary=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
 
 ### 2. First launch
