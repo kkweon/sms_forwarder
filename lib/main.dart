@@ -115,7 +115,7 @@ class SmsForwarderPage extends StatefulWidget {
   State<SmsForwarderPage> createState() => _SmsForwarderPageState();
 }
 
-class _SmsForwarderPageState extends State<SmsForwarderPage> {
+class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBindingObserver {
   final _telephony = Telephony.instance;
   bool _permissionsGranted = false;
   bool _forwardingEnabled = false;
@@ -126,7 +126,13 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadSettings();
   }
 
   Future<void> _init() async {
@@ -136,6 +142,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _phoneController.dispose();
     super.dispose();
   }
@@ -153,7 +160,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> {
     final statuses = await [Permission.sms, Permission.phone].request();
     final granted = statuses.values.every((s) => s.isGranted);
     setState(() => _permissionsGranted = granted);
-    if (granted && _forwardingEnabled) _startListening();
+    if (granted) _startListening();
   }
 
   Future<void> _loadSettings() async {
@@ -171,7 +178,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> {
     });
     await prefs.setStringList('destination_numbers', _destinationNumbers);
     debugPrint('[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers');
-    if (_forwardingEnabled && _permissionsGranted) _startListening();
+    if (_permissionsGranted) _startListening();
   }
 
   void _startListening() {
