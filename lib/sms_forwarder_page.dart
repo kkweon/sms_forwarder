@@ -1,14 +1,14 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'constants.dart';
-import 'sms_utils.dart';
+import 'log_entry.dart';
+import 'loop_detector.dart';
+import 'settings_service.dart';
 import 'sms_forwarder_service.dart';
+import 'sms_utils.dart';
 
 class SmsForwarderPage extends StatefulWidget {
   const SmsForwarderPage({super.key});
@@ -20,12 +20,14 @@ class SmsForwarderPage extends StatefulWidget {
 class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBindingObserver {
   static const _methodChannel = MethodChannel('dev.kkweon.sms_forwarder/telephony');
   final _telephony = Telephony.instance;
+  SettingsService? _settings;
+  LoopDetector? _loopDetector;
   bool _permissionsGranted = false;
   bool _forwardingEnabled = false;
   bool _loopDetected = false;
   List<String> _destinationNumbers = [];
   List<String> _ownNumbers = [];
-  List<Map<String, dynamic>> _forwardingLog = [];
+  List<LogEntry> _forwardingLogs = [];
   final _phoneController = TextEditingController();
 
   @override
@@ -70,20 +72,21 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final logJson = prefs.getStringList(prefsForwardingLog) ?? [];
+    final settings = await SettingsService.load();
+    final loopDetector = await LoopDetector.load();
+    final rawNumbers = settings.destinationNumbers;
     setState(() {
-      _forwardingEnabled = prefs.getBool(prefsForwardingEnabled) ?? false;
-      _loopDetected = prefs.getBool(prefsLoopDetected) ?? false;
-      _destinationNumbers = (prefs.getStringList(prefsDestinationNumbers) ?? [])
+      _settings = settings;
+      _loopDetector = loopDetector;
+      _forwardingEnabled = settings.forwardingEnabled;
+      _loopDetected = loopDetector.detected;
+      _destinationNumbers = rawNumbers
           .map((n) => normalizePhone(n) ?? n)
           .toSet()
           .toList();
-      _forwardingLog = logJson
-          .map((e) => jsonDecode(e) as Map<String, dynamic>)
-          .toList();
+      _forwardingLogs = settings.forwardingLogs;
     });
-    await prefs.setStringList(prefsDestinationNumbers, _destinationNumbers);
+    await settings.setDestinationNumbers(_destinationNumbers);
     debugPrint('[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers');
     if (_permissionsGranted) _startListening();
   }
@@ -123,8 +126,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
       debugPrint('[SMS] FG: no keyword match, skipping');
       return;
     }
-    final prefs = await SharedPreferences.getInstance();
-    if (await checkLoopAndTrack(prefs)) {
+    final loopDetected = await _loopDetector!.countForward(
+      onLoopDetected: () => _settings!.setForwardingEnabled(false),
+    );
+    if (loopDetected) {
       setState(() {
         _forwardingEnabled = false;
         _loopDetected = true;
@@ -137,35 +142,13 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
       telephony: _telephony,
       message: message,
       destinationNumbers: _destinationNumbers,
-    ).then((entries) {
-      setState(() {
-        for (final entry in entries) {
-          _forwardingLog.insert(0, entry);
-        }
-        if (_forwardingLog.length > maxLogEntries) {
-          _forwardingLog.removeRange(maxLogEntries, _forwardingLog.length);
-        }
-      });
-      _saveLog();
+    ).then((newEntries) {
+      final logs = [...newEntries, ..._forwardingLogs]
+          .take(maxLogEntries)
+          .toList();
+      setState(() => _forwardingLogs = logs);
+      _settings!.saveLogs(logs);
     });
-  }
-
-  Future<void> _saveForwardingEnabled(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(prefsForwardingEnabled, value);
-  }
-
-  Future<void> _saveDestinationNumbers() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(prefsDestinationNumbers, _destinationNumbers);
-  }
-
-  Future<void> _saveLog() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(
-      prefsForwardingLog,
-      _forwardingLog.map((e) => jsonEncode(e)).toList(),
-    );
   }
 
   void _addNumber() {
@@ -195,24 +178,21 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
       _destinationNumbers.add(normalized);
       _phoneController.clear();
     });
-    _saveDestinationNumbers();
+    _settings!.setDestinationNumbers(_destinationNumbers);
   }
 
   void _removeNumber(int index) {
     setState(() => _destinationNumbers.removeAt(index));
-    _saveDestinationNumbers();
+    _settings!.setDestinationNumbers(_destinationNumbers);
   }
 
-  Future<void> _clearLog() async {
-    setState(() => _forwardingLog.clear());
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(prefsForwardingLog);
+  Future<void> _clearLogs() async {
+    setState(() => _forwardingLogs = []);
+    await _settings!.clearLogs();
   }
 
   Future<void> _resetLoop() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(prefsLoopDetected, false);
-    await prefs.remove(recentForwardsKey);
+    await _loopDetector!.reset();
     setState(() => _loopDetected = false);
   }
 
@@ -269,7 +249,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
               onChanged: canToggle
                   ? (value) {
                       setState(() => _forwardingEnabled = value);
-                      _saveForwardingEnabled(value);
+                      _settings!.setForwardingEnabled(value);
                       if (value) _startListening();
                     }
                   : null,
@@ -365,37 +345,36 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
                     children: [
                       Text('Forwarding Log',
                           style: Theme.of(context).textTheme.titleMedium),
-                      if (_forwardingLog.isNotEmpty)
+                      if (_forwardingLogs.isNotEmpty)
                         TextButton(
-                          onPressed: _clearLog,
+                          onPressed: _clearLogs,
                           child: const Text('Clear'),
                         ),
                     ],
                   ),
-                  if (_forwardingLog.isEmpty)
+                  if (_forwardingLogs.isEmpty)
                     const Text('No messages forwarded yet',
                         style: TextStyle(color: Colors.grey))
                   else
                     ...List.generate(
-                      _forwardingLog.length,
+                      _forwardingLogs.length,
                       (i) {
-                        final entry = _forwardingLog[i];
-                        final failed = entry['status'] != 'sent';
+                        final entry = _forwardingLogs[i];
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(
-                            failed ? Icons.error_outline : Icons.check_circle_outline,
-                            color: failed ? Colors.red : Colors.green,
+                            entry.failed ? Icons.error_outline : Icons.check_circle_outline,
+                            color: entry.failed ? Colors.red : Colors.green,
                             size: 20,
                           ),
-                          title: Text('From: ${entry['from']}  →  ${entry['to'] ?? '?'}'),
+                          title: Text('From: ${entry.from}  →  ${entry.to}'),
                           subtitle: Text(
-                            entry['body'] as String,
+                            entry.body,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           trailing: Text(
-                            formatTime(entry['time'] as String),
+                            formatTime(entry.time),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         );
