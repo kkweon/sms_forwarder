@@ -59,6 +59,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
     final sms = await Permission.sms.status;
     final phone = await Permission.phone.status;
     debugPrint('[SMS] permissions: sms=${sms.name} phone=${phone.name}');
+    if (!mounted) return;
     setState(() {
       _permissionsGranted = sms.isGranted && phone.isGranted;
     });
@@ -67,6 +68,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
   Future<void> _requestPermissions() async {
     final statuses = await [Permission.sms, Permission.phone].request();
     final granted = statuses.values.every((s) => s.isGranted);
+    if (!mounted) return;
     setState(() => _permissionsGranted = granted);
     if (granted) _startListening();
   }
@@ -74,19 +76,20 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
   Future<void> _loadSettings() async {
     final settings = await SettingsService.load();
     final loopDetector = await LoopDetector.load();
-    final rawNumbers = settings.destinationNumbers;
+    final normalizedNumbers = settings.destinationNumbers
+        .map((n) => normalizePhone(n) ?? n)
+        .toSet()
+        .toList();
+    await settings.setDestinationNumbers(normalizedNumbers);
+    if (!mounted) return;
     setState(() {
       _settings = settings;
       _loopDetector = loopDetector;
       _forwardingEnabled = settings.forwardingEnabled;
       _loopDetected = loopDetector.detected;
-      _destinationNumbers = rawNumbers
-          .map((n) => normalizePhone(n) ?? n)
-          .toSet()
-          .toList();
+      _destinationNumbers = normalizedNumbers;
       _forwardingLogs = settings.forwardingLogs;
     });
-    await settings.setDestinationNumbers(_destinationNumbers);
     debugPrint('[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers');
     if (_permissionsGranted) _startListening();
   }
@@ -94,6 +97,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
   Future<void> _loadOwnNumbers() async {
     try {
       final numbers = await _methodChannel.invokeListMethod<String>('getOwnPhoneNumbers') ?? [];
+      if (!mounted) return;
       setState(() {
         _ownNumbers = numbers
             .map((n) => normalizePhone(n))
@@ -130,6 +134,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
       onLoopDetected: () => _settings!.setForwardingEnabled(false),
     );
     if (loopDetected) {
+      if (!mounted) return;
       setState(() {
         _forwardingEnabled = false;
         _loopDetected = true;
@@ -142,12 +147,13 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
       telephony: _telephony,
       message: message,
       destinationNumbers: _destinationNumbers,
-    ).then((newEntries) {
+    ).then((newEntries) async {
       final logs = [...newEntries, ..._forwardingLogs]
           .take(maxLogEntries)
           .toList();
+      await _settings!.saveLogs(logs);
+      if (!mounted) return;
       setState(() => _forwardingLogs = logs);
-      _settings!.saveLogs(logs);
     });
   }
 
@@ -174,16 +180,18 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
       _phoneController.clear();
       return;
     }
+    final updatedNumbers = [..._destinationNumbers, normalized];
     setState(() {
-      _destinationNumbers.add(normalized);
+      _destinationNumbers = updatedNumbers;
       _phoneController.clear();
     });
-    _settings!.setDestinationNumbers(_destinationNumbers);
+    _settings!.setDestinationNumbers(updatedNumbers);
   }
 
   void _removeNumber(int index) {
-    setState(() => _destinationNumbers.removeAt(index));
-    _settings!.setDestinationNumbers(_destinationNumbers);
+    final updatedNumbers = [..._destinationNumbers]..removeAt(index);
+    setState(() => _destinationNumbers = updatedNumbers);
+    _settings!.setDestinationNumbers(updatedNumbers);
   }
 
   Future<void> _clearLogs() async {
@@ -193,6 +201,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
 
   Future<void> _resetLoop() async {
     await _loopDetector!.reset();
+    if (!mounted) return;
     setState(() => _loopDetected = false);
   }
 
