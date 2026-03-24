@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'constants.dart';
+const _recentForwardsKey = 'recent_forwards';
+const _loopWindowMs = 60 * 1000; // 60 seconds
+const _loopThreshold = 5;
+const _prefsLoopDetected = 'loop_detected';
 
 class LoopDetector {
   final SharedPreferences _prefs;
@@ -10,7 +13,7 @@ class LoopDetector {
   static Future<LoopDetector> load() async =>
       LoopDetector._(await SharedPreferences.getInstance());
 
-  bool get detected => _prefs.getBool(prefsLoopDetected) ?? false;
+  bool get detected => _prefs.getBool(_prefsLoopDetected) ?? false;
 
   /// Counts this forward toward the rate limit.
   /// Returns true if the limit was exceeded (loop detected).
@@ -19,29 +22,29 @@ class LoopDetector {
     required Future<void> Function() onLoopDetected,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final cutoff = now - loopWindowMs;
-    final raw = _prefs.getStringList(recentForwardsKey) ?? [];
+    final cutoff = now - _loopWindowMs;
+    final raw = _prefs.getStringList(_recentForwardsKey) ?? [];
     final recent = raw
         .map((s) => int.tryParse(s) ?? 0)
         .where((ts) => ts > cutoff)
         .toList();
-    if (recent.length >= loopThreshold) {
-      await _prefs.setBool(prefsLoopDetected, true);
-      await _prefs.remove(recentForwardsKey);
-      debugPrint('[SMS] Loop detected (${recent.length} forwards in ${loopWindowMs ~/ 1000}s)');
+    if (recent.length >= _loopThreshold) {
+      await _prefs.setBool(_prefsLoopDetected, true);
+      await _prefs.remove(_recentForwardsKey);
+      debugPrint('[SMS] Loop detected (${recent.length} forwards in ${_loopWindowMs ~/ 1000}s)');
       await onLoopDetected();
       return true;
     }
     recent.add(now);
     await _prefs.setStringList(
-      recentForwardsKey,
+      _recentForwardsKey,
       recent.map((ts) => ts.toString()).toList(),
     );
     return false;
   }
 
   Future<void> reset() async {
-    await _prefs.setBool(prefsLoopDetected, false);
-    await _prefs.remove(recentForwardsKey);
+    await _prefs.setBool(_prefsLoopDetected, false);
+    await _prefs.remove(_recentForwardsKey);
   }
 }

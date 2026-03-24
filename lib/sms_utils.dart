@@ -1,4 +1,6 @@
-import 'constants.dart';
+const keywords = [
+  'verif', 'code', 'otp', 'passcode', 'pin', 'auth', 'confirm',
+];
 
 /// Normalizes a phone number to E.164-like form for consistent storage and comparison.
 /// Returns null if the input has fewer than 7 digits.

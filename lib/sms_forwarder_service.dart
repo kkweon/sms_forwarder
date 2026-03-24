@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:another_telephony/telephony.dart';
 
-import 'constants.dart';
 import 'log_entry.dart';
 import 'loop_detector.dart';
 import 'settings_service.dart';
 import 'sms_utils.dart';
+
+const maxLogEntries = 50;
+const _sendTimeoutSeconds = 30;
 
 /// Sends [message] to all [destinationNumbers] and returns a log entry per recipient.
 /// Callers are responsible for checking forwarding_enabled, keyword matching,
@@ -47,7 +49,7 @@ Future<List<LogEntry>> forwardSms({
   }
 
   await Future.wait(completers.entries.map((e) => e.value.future.timeout(
-    Duration(seconds: sendTimeoutSeconds),
+    Duration(seconds: _sendTimeoutSeconds),
     onTimeout: () {
       debugPrint('[SMS] timeout waiting for status from ${e.key}');
       pendingEntries[e.key] = LogEntry(

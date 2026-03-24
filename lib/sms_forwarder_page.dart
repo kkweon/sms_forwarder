@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'constants.dart';
 import 'log_entry.dart';
 import 'loop_detector.dart';
 import 'settings_service.dart';
