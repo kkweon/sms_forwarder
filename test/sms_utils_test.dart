@@ -1,7 +1,41 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sms_forwarder/main.dart';
+import 'package:sms_forwarder/sms_utils.dart';
 
 void main() {
+  group('normalizePhone', () {
+    test('10-digit US local gets +1 prefix', () {
+      expect(normalizePhone('2025550123'), '+12025550123');
+    });
+
+    test('+1 US number stays the same', () {
+      expect(normalizePhone('+12025550123'), '+12025550123');
+    });
+
+    test('10-digit local and +1 number normalize to same value (regression: duplicate bug)', () {
+      expect(normalizePhone('2025550123'), equals(normalizePhone('+12025550123')));
+    });
+
+    test('strips formatting characters', () {
+      expect(normalizePhone('(202) 555-0123'), '+12025550123');
+      expect(normalizePhone('+1-202-555-0123'), '+12025550123');
+    });
+
+    test('11-digit number with leading 1 gets + prefix', () {
+      expect(normalizePhone('12025550123'), '+12025550123');
+    });
+
+    test('international number gets + prefix', () {
+      expect(normalizePhone('447911123456'), '+447911123456');
+      expect(normalizePhone('+447911123456'), '+447911123456');
+    });
+
+    test('returns null for fewer than 7 digits', () {
+      expect(normalizePhone('123456'), isNull);
+      expect(normalizePhone(''), isNull);
+      expect(normalizePhone('abc'), isNull);
+    });
+  });
+
   group('containsVerificationCode', () {
     test('matches standard OTP/verification messages', () {
       expect(containsVerificationCode('Your verification code is 123456'), isTrue);
