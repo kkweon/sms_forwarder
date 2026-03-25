@@ -1,0 +1,41 @@
+import 'package:another_telephony/telephony.dart';
+import 'package:sms_forwarder/sms_service.dart';
+
+class RecordedSend {
+  final String to;
+  final String message;
+  RecordedSend(this.to, this.message);
+}
+
+/// Fake [SmsService] for widget and integration tests.
+///
+/// Call [inject] to simulate an incoming SMS message.
+/// Inspect [sent] to verify outgoing SMS sends.
+class FakeSmsService implements SmsService {
+  void Function(SmsMessage)? _listener;
+  final List<RecordedSend> sent = [];
+
+  /// Simulates an incoming SMS arriving on the device.
+  void inject(SmsMessage message) => _listener?.call(message);
+
+  @override
+  void startListening(void Function(SmsMessage) onMessage) {
+    _listener = onMessage;
+  }
+
+  @override
+  void stopListening() {
+    _listener = null;
+  }
+
+  @override
+  Future<void> sendSms({
+    required String to,
+    required String message,
+    bool isMultipart = false,
+    required void Function(SendStatus) statusListener,
+  }) async {
+    sent.add(RecordedSend(to, message));
+    statusListener(SendStatus.SENT);
+  }
+}

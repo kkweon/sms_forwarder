@@ -2,6 +2,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sms_forwarder/sms_utils.dart';
 
 void main() {
+  group('preprocessBody', () {
+    test('strips <#> prefix', () {
+      expect(preprocessBody('<#>Hello world'), 'Hello world');
+      expect(preprocessBody('Hello world'), 'Hello world');
+    });
+
+    test('strips trailing 11-char app hash', () {
+      expect(preprocessBody('Code 1234. 3olHr09B9Po'), 'Code 1234.');
+    });
+
+    test('strips both prefix and hash', () {
+      expect(
+        preprocessBody('<#>BofA: Code 781265. 3olHr09B9Po'),
+        'BofA: Code 781265.',
+      );
+    });
+
+    test('no-op on plain messages', () {
+      expect(preprocessBody('Your code is 1234'), 'Your code is 1234');
+    });
+
+    test('does not strip hash-like suffix that is not 11 chars', () {
+      expect(preprocessBody('Code 1234. abc'), 'Code 1234. abc');
+    });
+  });
+
   group('normalizePhone', () {
     test('10-digit US local gets +1 prefix', () {
       expect(normalizePhone('2025550123'), '+12025550123');
@@ -70,6 +96,17 @@ void main() {
     test('rejects digit sequences outside 4-8 range', () {
       expect(containsVerificationCode('Your code is 123'), isFalse);
       expect(containsVerificationCode('Your code is 123456789'), isFalse);
+    });
+
+    test('matches BofA SMS Retriever format message (regression)', () {
+      expect(
+        containsVerificationCode(
+          "<#>BofA: DO NOT share this Sign In code. We will NEVER call you or "
+          "text you for it. Code 781265. Reply HELP if you didn't request it. "
+          "3olHr09B9Po",
+        ),
+        isTrue,
+      );
     });
   });
 }
