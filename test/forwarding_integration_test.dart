@@ -1,8 +1,8 @@
-import 'package:another_telephony/telephony.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sms_forwarder/sms_forwarder_page.dart';
+import 'package:sms_forwarder/sms_utils.dart';
 
 import 'fake_sms_service.dart';
 
@@ -48,7 +48,7 @@ void main() {
       await _enableForwarding(tester);
 
       // Simulate the BofA SMS Retriever API OTP message arriving.
-      fake.inject(SmsMessage(
+      fake.inject(makeSmsMessage(
         address: 'BofA',
         body: "<#>BofA: DO NOT share this Sign In code. We will NEVER call "
             "you or text you for it. Code 781265. Reply HELP if you didn't "
@@ -69,7 +69,7 @@ void main() {
       await _addDestination(tester, '+12025550123');
       await _enableForwarding(tester);
 
-      fake.inject(SmsMessage(
+      fake.inject(makeSmsMessage(
         address: 'Google',
         body: 'Your Google verification code is 654321',
       ));
@@ -84,7 +84,7 @@ void main() {
       await _addDestination(tester, '+12025550123');
       await _enableForwarding(tester);
 
-      fake.inject(SmsMessage(
+      fake.inject(makeSmsMessage(
         address: 'Mom',
         body: 'Hey are you coming for dinner tonight?',
       ));
@@ -99,7 +99,7 @@ void main() {
       await _addDestination(tester, '+12025550123');
       // Intentionally do NOT enable forwarding.
 
-      fake.inject(SmsMessage(
+      fake.inject(makeSmsMessage(
         address: 'BofA',
         body: 'Code 781265.',
       ));
@@ -114,7 +114,7 @@ void main() {
       await _addDestination(tester, '+19998887777');
       await _enableForwarding(tester);
 
-      fake.inject(SmsMessage(
+      fake.inject(makeSmsMessage(
         address: 'Chase',
         body: 'Your Chase verification code: 5544',
       ));

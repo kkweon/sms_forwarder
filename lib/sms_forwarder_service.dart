@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -122,5 +121,5 @@ Future<void> backgroundSmsEntryPoint() async {
   await prefs.remove('pending_bg_sms_body');
   if (body == null || body.isEmpty) return;
   debugPrint('[SMS] backgroundSmsEntryPoint: from=$address body=$body');
-  await backgroundMessageHandler(SmsMessage(address: address, body: body));
+  await backgroundMessageHandler(makeSmsMessage(address: address, body: body));
 }

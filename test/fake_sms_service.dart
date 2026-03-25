@@ -11,9 +11,13 @@ class RecordedSend {
 ///
 /// Call [inject] to simulate an incoming SMS message.
 /// Inspect [sent] to verify outgoing SMS sends.
+/// Pass [statusToReport] to simulate send failures.
 class FakeSmsService implements SmsService {
   void Function(SmsMessage)? _listener;
   final List<RecordedSend> sent = [];
+  final SendStatus statusToReport;
+
+  FakeSmsService({this.statusToReport = SendStatus.SENT});
 
   /// Simulates an incoming SMS arriving on the device.
   void inject(SmsMessage message) => _listener?.call(message);
@@ -36,6 +40,6 @@ class FakeSmsService implements SmsService {
     required void Function(SendStatus) statusListener,
   }) async {
     sent.add(RecordedSend(to, message));
-    statusListener(SendStatus.SENT);
+    statusListener(statusToReport);
   }
 }

@@ -4,6 +4,7 @@ import 'package:another_telephony/telephony.dart';
 import 'package:flutter/services.dart';
 
 import 'sms_service.dart';
+import 'sms_utils.dart';
 
 /// Production [SmsService] backed by the native EventChannel (for receiving)
 /// and a [Telephony] instance (for sending).
@@ -25,7 +26,7 @@ class RealSmsService implements SmsService {
     _sub?.cancel();
     _sub = _eventChannel.receiveBroadcastStream().listen((dynamic event) {
       if (event is Map) {
-        onMessage(SmsMessage(
+        onMessage(makeSmsMessage(
           address: event['address'] as String?,
           body: event['body'] as String?,
         ));
