@@ -13,13 +13,22 @@ String? normalizePhone(String input) {
   return '+$digits';
 }
 
+/// Strips Android SMS Retriever API formatting from a message body:
+/// removes the leading `<#>` prefix and any trailing 11-character app hash.
+String preprocessBody(String body) {
+  var s = body.startsWith('<#>') ? body.substring(3) : body;
+  s = s.replaceFirst(RegExp(r'\s+\w{11}$'), '');
+  return s.trim();
+}
+
 bool containsVerificationCode(String text) {
-  if (text.isEmpty) return false;
+  final cleaned = preprocessBody(text);
+  if (cleaned.isEmpty) return false;
   final hasKeyword = RegExp(
     keywords.join('|'),
     caseSensitive: false,
-  ).hasMatch(text);
-  final hasDigits = RegExp(r'\b\d{4,8}\b').hasMatch(text);
+  ).hasMatch(cleaned);
+  final hasDigits = RegExp(r'\b\d{4,8}\b').hasMatch(cleaned);
   return hasKeyword && hasDigits;
 }
 

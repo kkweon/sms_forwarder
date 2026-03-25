@@ -5,20 +5,37 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'log_entry.dart';
 import 'loop_detector.dart';
+import 'real_sms_service.dart';
 import 'settings_service.dart';
 import 'sms_forwarder_service.dart';
+import 'sms_service.dart';
 import 'sms_utils.dart';
 
 class SmsForwarderPage extends StatefulWidget {
-  const SmsForwarderPage({super.key});
+  const SmsForwarderPage({
+    super.key,
+    this.smsService,
+    this.permissionsGrantedOverride,
+  });
+
+  /// Injected [SmsService] for tests. Defaults to [RealSmsService] in production.
+  final SmsService? smsService;
+
+  /// When non-null, overrides the Android permission check result.
+  /// Set to `true` in widget tests to bypass [permission_handler].
+  final bool? permissionsGrantedOverride;
 
   @override
   State<SmsForwarderPage> createState() => _SmsForwarderPageState();
 }
 
-class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBindingObserver {
-  static const _methodChannel = MethodChannel('dev.kkweon.sms_forwarder/telephony');
-  final _telephony = Telephony.instance;
+class _SmsForwarderPageState extends State<SmsForwarderPage>
+    with WidgetsBindingObserver {
+  static const _methodChannel =
+      MethodChannel('dev.kkweon.sms_forwarder/telephony');
+
+  late final SmsService _smsService;
+
   SettingsService? _settings;
   LoopDetector? _loopDetector;
   bool _permissionsGranted = false;
@@ -32,6 +49,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
   @override
   void initState() {
     super.initState();
+    _smsService = widget.smsService ?? RealSmsService();
     WidgetsBinding.instance.addObserver(this);
     _init();
   }
@@ -50,11 +68,16 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _smsService.stopListening();
     _phoneController.dispose();
     super.dispose();
   }
 
   Future<void> _checkPermissions() async {
+    if (widget.permissionsGrantedOverride != null) {
+      setState(() => _permissionsGranted = widget.permissionsGrantedOverride!);
+      return;
+    }
     final sms = await Permission.sms.status;
     final phone = await Permission.phone.status;
     debugPrint('[SMS] permissions: sms=${sms.name} phone=${phone.name}');
@@ -89,13 +112,17 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
       _destinationNumbers = normalizedNumbers;
       _forwardingLogs = settings.forwardingLogs;
     });
-    debugPrint('[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers');
+    debugPrint(
+        '[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers');
     if (_permissionsGranted) _startListening();
   }
 
   Future<void> _loadOwnNumbers() async {
+    if (widget.permissionsGrantedOverride != null) return; // skip in tests
     try {
-      final numbers = await _methodChannel.invokeListMethod<String>('getOwnPhoneNumbers') ?? [];
+      final numbers =
+          await _methodChannel.invokeListMethod<String>('getOwnPhoneNumbers') ??
+              [];
       if (!mounted) return;
       setState(() {
         _ownNumbers = numbers
@@ -111,20 +138,17 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
 
   void _startListening() {
     debugPrint('[SMS] startListening called');
-    _telephony.listenIncomingSms(
-      onNewMessage: _onMessage,
-      onBackgroundMessage: backgroundMessageHandler,
-      listenInBackground: true,
-    );
+    _smsService.startListening(_onMessage);
   }
 
   void _onMessage(SmsMessage message) async {
-    debugPrint('[SMS] FG handler fired: from=${message.address} body=${message.body}');
+    debugPrint(
+        '[SMS] FG handler fired: from=${message.address} body=${message.body}');
     if (!_forwardingEnabled) {
       debugPrint('[SMS] FG: forwarding disabled, skipping');
       return;
     }
-    final body = message.body ?? '';
+    final body = preprocessBody(message.body ?? '');
     if (!containsVerificationCode(body)) {
       debugPrint('[SMS] FG: no keyword match, skipping');
       return;
@@ -143,7 +167,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
     }
     debugPrint('[SMS] FG: forwarding to $_destinationNumbers');
     forwardSms(
-      telephony: _telephony,
+      smsService: _smsService,
       message: message,
       destinationNumbers: _destinationNumbers,
     ).then((newEntries) async {
@@ -167,7 +191,8 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
     if (_ownNumbers.contains(normalized)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cannot add your own number — this would create a forwarding loop'),
+          content: Text(
+              'Cannot add your own number — this would create a forwarding loop'),
         ),
       );
       return;
@@ -222,9 +247,11 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
                 leading: const Icon(Icons.warning_amber, color: Colors.red),
                 title: const Text(
                   'Forwarding loop detected',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Colors.red, fontWeight: FontWeight.bold),
                 ),
-                subtitle: const Text('Forwarding was automatically disabled to prevent a loop.'),
+                subtitle: const Text(
+                    'Forwarding was automatically disabled to prevent a loop.'),
                 trailing: TextButton(
                   onPressed: _resetLoop,
                   child: const Text('Reset'),
@@ -371,11 +398,14 @@ class _SmsForwarderPageState extends State<SmsForwarderPage> with WidgetsBinding
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(
-                            entry.failed ? Icons.error_outline : Icons.check_circle_outline,
+                            entry.failed
+                                ? Icons.error_outline
+                                : Icons.check_circle_outline,
                             color: entry.failed ? Colors.red : Colors.green,
                             size: 20,
                           ),
-                          title: Text('From: ${entry.from}  →  ${entry.to}'),
+                          title:
+                              Text('From: ${entry.from}  →  ${entry.to}'),
                           subtitle: Text(
                             entry.body,
                             maxLines: 2,
