@@ -87,8 +87,20 @@ void main() {
     test('preserves order', () async {
       final settings = await SettingsService.load();
       final logs = [
-        const LogEntry(time: 'first', from: 'A', to: 'to', body: 'b', status: 'sent'),
-        const LogEntry(time: 'second', from: 'B', to: 'to', body: 'b', status: 'sent'),
+        const LogEntry(
+          time: 'first',
+          from: 'A',
+          to: 'to',
+          body: 'b',
+          status: 'sent',
+        ),
+        const LogEntry(
+          time: 'second',
+          from: 'B',
+          to: 'to',
+          body: 'b',
+          status: 'sent',
+        ),
       ];
       await settings.saveLogs(logs);
 
@@ -102,7 +114,13 @@ void main() {
     test('empties forwardingLogs', () async {
       final settings = await SettingsService.load();
       await settings.saveLogs([
-        const LogEntry(time: 't', from: 'f', to: 'to', body: 'b', status: 'sent'),
+        const LogEntry(
+          time: 't',
+          from: 'f',
+          to: 'to',
+          body: 'b',
+          status: 'sent',
+        ),
       ]);
       await settings.clearLogs();
       expect(settings.forwardingLogs, isEmpty);

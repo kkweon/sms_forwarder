@@ -25,38 +25,49 @@ void main() {
   });
 
   group('LoopDetector countForward', () {
-    test('returns false and does not trigger callback on first forward', () async {
-      var callbackCalled = false;
-      final detector = await LoopDetector.load();
-      final result = await detector.countForward(
-        onLoopDetected: () async => callbackCalled = true,
-      );
-      expect(result, isFalse);
-      expect(callbackCalled, isFalse);
-    });
-
-    test('returns false for five consecutive forwards (below threshold)', () async {
-      final detector = await LoopDetector.load();
-      for (var i = 0; i < 5; i++) {
-        final result = await detector.countForward(onLoopDetected: () async {});
+    test(
+      'returns false and does not trigger callback on first forward',
+      () async {
+        var callbackCalled = false;
+        final detector = await LoopDetector.load();
+        final result = await detector.countForward(
+          onLoopDetected: () async => callbackCalled = true,
+        );
         expect(result, isFalse);
-      }
-    });
+        expect(callbackCalled, isFalse);
+      },
+    );
 
-    test('returns true and calls onLoopDetected when 5 recent entries are already in prefs', () async {
-      // Pre-seed 5 recent timestamps so the next call sees >= threshold.
-      final prefs = await SharedPreferences.getInstance();
-      final ts = DateTime.now().millisecondsSinceEpoch.toString();
-      await prefs.setStringList('recent_forwards', [ts, ts, ts, ts, ts]);
+    test(
+      'returns false for five consecutive forwards (below threshold)',
+      () async {
+        final detector = await LoopDetector.load();
+        for (var i = 0; i < 5; i++) {
+          final result = await detector.countForward(
+            onLoopDetected: () async {},
+          );
+          expect(result, isFalse);
+        }
+      },
+    );
 
-      var callbackCalled = false;
-      final detector = await LoopDetector.load();
-      final result = await detector.countForward(
-        onLoopDetected: () async => callbackCalled = true,
-      );
-      expect(result, isTrue);
-      expect(callbackCalled, isTrue);
-    });
+    test(
+      'returns true and calls onLoopDetected when 5 recent entries are already in prefs',
+      () async {
+        // Pre-seed 5 recent timestamps so the next call sees >= threshold.
+        final prefs = await SharedPreferences.getInstance();
+        final ts = DateTime.now().millisecondsSinceEpoch.toString();
+        await prefs.setStringList('recent_forwards', [ts, ts, ts, ts, ts]);
+
+        var callbackCalled = false;
+        final detector = await LoopDetector.load();
+        final result = await detector.countForward(
+          onLoopDetected: () async => callbackCalled = true,
+        );
+        expect(result, isTrue);
+        expect(callbackCalled, isTrue);
+      },
+    );
 
     test('sets detected flag after threshold breach', () async {
       final prefs = await SharedPreferences.getInstance();
@@ -81,7 +92,8 @@ void main() {
     test('prunes entries older than 60 seconds', () async {
       // Pre-seed 5 old timestamps — all will be pruned, so count stays at 1.
       final prefs = await SharedPreferences.getInstance();
-      final old = (DateTime.now().millisecondsSinceEpoch - 61 * 1000).toString();
+      final old = (DateTime.now().millisecondsSinceEpoch - 61 * 1000)
+          .toString();
       await prefs.setStringList('recent_forwards', [old, old, old, old, old]);
 
       var callbackCalled = false;
@@ -98,12 +110,21 @@ void main() {
     test('counts only recent entries toward threshold', () async {
       // 5 stale + 5 recent → after pruning, 5 recent entries remain → triggers.
       final prefs = await SharedPreferences.getInstance();
-      final old = (DateTime.now().millisecondsSinceEpoch - 61 * 1000).toString();
+      final old = (DateTime.now().millisecondsSinceEpoch - 61 * 1000)
+          .toString();
       final recent = DateTime.now().millisecondsSinceEpoch.toString();
-      await prefs.setStringList(
-        'recent_forwards',
-        [old, old, old, old, old, recent, recent, recent, recent, recent],
-      );
+      await prefs.setStringList('recent_forwards', [
+        old,
+        old,
+        old,
+        old,
+        old,
+        recent,
+        recent,
+        recent,
+        recent,
+        recent,
+      ]);
 
       var callbackCalled = false;
       final detector = await LoopDetector.load();

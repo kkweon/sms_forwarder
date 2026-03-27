@@ -12,24 +12,27 @@ import 'sms_utils.dart';
 /// Pass [telephony] explicitly to use [Telephony.backgroundInstance] in
 /// background isolates; omit to default to [Telephony.instance].
 class RealSmsService implements SmsService {
-  static const _eventChannel =
-      EventChannel('dev.kkweon.sms_forwarder/sms_events');
+  static const _eventChannel = EventChannel(
+    'dev.kkweon.sms_forwarder/sms_events',
+  );
 
   final Telephony _telephony;
   StreamSubscription<dynamic>? _sub;
 
   RealSmsService({Telephony? telephony})
-      : _telephony = telephony ?? Telephony.instance;
+    : _telephony = telephony ?? Telephony.instance;
 
   @override
   void startListening(void Function(SmsMessage) onMessage) {
     _sub?.cancel();
     _sub = _eventChannel.receiveBroadcastStream().listen((dynamic event) {
       if (event is Map) {
-        onMessage(makeSmsMessage(
-          address: event['address'] as String?,
-          body: event['body'] as String?,
-        ));
+        onMessage(
+          makeSmsMessage(
+            address: event['address'] as String?,
+            body: event['body'] as String?,
+          ),
+        );
       }
     });
   }

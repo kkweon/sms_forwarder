@@ -17,7 +17,8 @@ class SettingsService {
 
   // --- Reads ---
 
-  bool get forwardingEnabled => _prefs.getBool(_prefsForwardingEnabled) ?? false;
+  bool get forwardingEnabled =>
+      _prefs.getBool(_prefsForwardingEnabled) ?? false;
 
   List<String> get destinationNumbers =>
       _prefs.getStringList(_prefsDestinationNumbers) ?? [];
@@ -40,9 +41,9 @@ class SettingsService {
 
   /// Saves [logs] to persistent storage (newest-first order).
   Future<void> saveLogs(List<LogEntry> logs) => _prefs.setStringList(
-        _prefsForwardingLog,
-        logs.map((e) => jsonEncode(e.toJson())).toList(),
-      );
+    _prefsForwardingLog,
+    logs.map((e) => jsonEncode(e.toJson())).toList(),
+  );
 
   Future<void> clearLogs() => _prefs.remove(_prefsForwardingLog);
 }

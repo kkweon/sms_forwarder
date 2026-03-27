@@ -10,12 +10,14 @@ import 'fake_sms_service.dart';
 /// [SharedPreferences] must be mocked before calling this.
 Future<FakeSmsService> _buildPage(WidgetTester tester) async {
   final fake = FakeSmsService();
-  await tester.pumpWidget(MaterialApp(
-    home: SmsForwarderPage(
-      smsService: fake,
-      permissionsGrantedOverride: true,
+  await tester.pumpWidget(
+    MaterialApp(
+      home: SmsForwarderPage(
+        smsService: fake,
+        permissionsGrantedOverride: true,
+      ),
     ),
-  ));
+  );
   // Wait for async init (_checkPermissions, _loadSettings).
   await tester.pumpAndSettle();
   return fake;
@@ -48,12 +50,15 @@ void main() {
       await _enableForwarding(tester);
 
       // Simulate the BofA SMS Retriever API OTP message arriving.
-      fake.inject(makeSmsMessage(
-        address: 'BofA',
-        body: "<#>BofA: DO NOT share this Sign In code. We will NEVER call "
-            "you or text you for it. Code 781265. Reply HELP if you didn't "
-            "request it. 3olHr09B9Po",
-      ));
+      fake.inject(
+        makeSmsMessage(
+          address: 'BofA',
+          body:
+              "<#>BofA: DO NOT share this Sign In code. We will NEVER call "
+              "you or text you for it. Code 781265. Reply HELP if you didn't "
+              "request it. 3olHr09B9Po",
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(fake.sent, hasLength(1));
@@ -63,66 +68,76 @@ void main() {
       expect(fake.sent.first.message, isNot(contains('<#>')));
     });
 
-    testWidgets('standard OTP message without SMS Retriever prefix is forwarded',
-        (tester) async {
-      final fake = await _buildPage(tester);
-      await _addDestination(tester, '+12025550123');
-      await _enableForwarding(tester);
+    testWidgets(
+      'standard OTP message without SMS Retriever prefix is forwarded',
+      (tester) async {
+        final fake = await _buildPage(tester);
+        await _addDestination(tester, '+12025550123');
+        await _enableForwarding(tester);
 
-      fake.inject(makeSmsMessage(
-        address: 'Google',
-        body: 'Your Google verification code is 654321',
-      ));
-      await tester.pumpAndSettle();
+        fake.inject(
+          makeSmsMessage(
+            address: 'Google',
+            body: 'Your Google verification code is 654321',
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(fake.sent, hasLength(1));
-      expect(fake.sent.first.message, contains('654321'));
-    });
+        expect(fake.sent, hasLength(1));
+        expect(fake.sent.first.message, contains('654321'));
+      },
+    );
 
     testWidgets('non-OTP message is NOT forwarded', (tester) async {
       final fake = await _buildPage(tester);
       await _addDestination(tester, '+12025550123');
       await _enableForwarding(tester);
 
-      fake.inject(makeSmsMessage(
-        address: 'Mom',
-        body: 'Hey are you coming for dinner tonight?',
-      ));
+      fake.inject(
+        makeSmsMessage(
+          address: 'Mom',
+          body: 'Hey are you coming for dinner tonight?',
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(fake.sent, isEmpty);
     });
 
-    testWidgets('message is NOT forwarded when forwarding is disabled',
-        (tester) async {
+    testWidgets('message is NOT forwarded when forwarding is disabled', (
+      tester,
+    ) async {
       final fake = await _buildPage(tester);
       await _addDestination(tester, '+12025550123');
       // Intentionally do NOT enable forwarding.
 
-      fake.inject(makeSmsMessage(
-        address: 'BofA',
-        body: 'Code 781265.',
-      ));
+      fake.inject(makeSmsMessage(address: 'BofA', body: 'Code 781265.'));
       await tester.pumpAndSettle();
 
       expect(fake.sent, isEmpty);
     });
 
-    testWidgets('message is forwarded to multiple destinations', (tester) async {
+    testWidgets('message is forwarded to multiple destinations', (
+      tester,
+    ) async {
       final fake = await _buildPage(tester);
       await _addDestination(tester, '+12025550123');
       await _addDestination(tester, '+19998887777');
       await _enableForwarding(tester);
 
-      fake.inject(makeSmsMessage(
-        address: 'Chase',
-        body: 'Your Chase verification code: 5544',
-      ));
+      fake.inject(
+        makeSmsMessage(
+          address: 'Chase',
+          body: 'Your Chase verification code: 5544',
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(fake.sent, hasLength(2));
-      expect(fake.sent.map((s) => s.to),
-          containsAll(['+12025550123', '+19998887777']));
+      expect(
+        fake.sent.map((s) => s.to),
+        containsAll(['+12025550123', '+19998887777']),
+      );
     });
   });
 }

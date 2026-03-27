@@ -31,7 +31,9 @@ class _DebugLogPageState extends State<DebugLogPage> {
   Future<void> _load() async {
     final content = await widget.logger.readAll();
     if (!mounted) return;
-    setState(() => _logContent = content.isEmpty ? '(no log entries yet)' : content);
+    setState(
+      () => _logContent = content.isEmpty ? '(no log entries yet)' : content,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
@@ -49,9 +51,9 @@ class _DebugLogPageState extends State<DebugLogPage> {
 
   void _copyAll() {
     Clipboard.setData(ClipboardData(text: _logContent));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Log copied to clipboard')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Log copied to clipboard')));
   }
 
   @override

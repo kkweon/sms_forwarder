@@ -21,12 +21,24 @@ void main() {
     });
 
     test('failed', () {
-      const e = LogEntry(time: 't', from: 'f', to: 'to', body: 'b', status: 'failed');
+      const e = LogEntry(
+        time: 't',
+        from: 'f',
+        to: 'to',
+        body: 'b',
+        status: 'failed',
+      );
       expect(LogEntry.fromJson(e.toJson()).status, 'failed');
     });
 
     test('timeout', () {
-      const e = LogEntry(time: 't', from: 'f', to: 'to', body: 'b', status: 'timeout');
+      const e = LogEntry(
+        time: 't',
+        from: 'f',
+        to: 'to',
+        body: 'b',
+        status: 'timeout',
+      );
       expect(LogEntry.fromJson(e.toJson()).status, 'timeout');
     });
   });
@@ -49,12 +61,24 @@ void main() {
     });
 
     test('returns true for failed', () {
-      const e = LogEntry(time: 't', from: 'f', to: 'to', body: 'b', status: 'failed');
+      const e = LogEntry(
+        time: 't',
+        from: 'f',
+        to: 'to',
+        body: 'b',
+        status: 'failed',
+      );
       expect(e.failed, isTrue);
     });
 
     test('returns true for timeout', () {
-      const e = LogEntry(time: 't', from: 'f', to: 'to', body: 'b', status: 'timeout');
+      const e = LogEntry(
+        time: 't',
+        from: 'f',
+        to: 'to',
+        body: 'b',
+        status: 'timeout',
+      );
       expect(e.failed, isTrue);
     });
   });

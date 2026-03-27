@@ -32,7 +32,9 @@ class LoopDetector {
     if (recent.length >= _loopThreshold) {
       await _prefs.setBool(_prefsLoopDetected, true);
       await _prefs.remove(_recentForwardsKey);
-      appLog('[SMS] Loop detected (${recent.length} forwards in ${_loopWindowMs ~/ 1000}s)');
+      appLog(
+        '[SMS] Loop detected (${recent.length} forwards in ${_loopWindowMs ~/ 1000}s)',
+      );
       await onLoopDetected();
       return true;
     }

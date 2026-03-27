@@ -53,26 +53,32 @@ Future<List<LogEntry>> forwardSms({
     );
   }
 
-  await Future.wait(completers.entries.map((e) => e.value.future.timeout(
-    Duration(seconds: _sendTimeoutSeconds),
-    onTimeout: () {
-      appLog('[SMS] timeout waiting for status from ${e.key}');
-      pendingEntries[e.key] = LogEntry(
-        time: now,
-        from: from,
-        to: e.key,
-        body: body,
-        status: 'timeout',
-      );
-    },
-  )));
+  await Future.wait(
+    completers.entries.map(
+      (e) => e.value.future.timeout(
+        Duration(seconds: _sendTimeoutSeconds),
+        onTimeout: () {
+          appLog('[SMS] timeout waiting for status from ${e.key}');
+          pendingEntries[e.key] = LogEntry(
+            time: now,
+            from: from,
+            to: e.key,
+            body: body,
+            status: 'timeout',
+          );
+        },
+      ),
+    ),
+  );
 
   return pendingEntries.values.toList();
 }
 
 @pragma('vm:entry-point')
 Future<void> backgroundMessageHandler(SmsMessage message) async {
-  appLog('[SMS] BG handler fired: from=${message.address} body=${message.body}');
+  appLog(
+    '[SMS] BG handler fired: from=${message.address} body=${message.body}',
+  );
   try {
     final settings = await SettingsService.load();
     if (!settings.forwardingEnabled) {
@@ -102,9 +108,10 @@ Future<void> backgroundMessageHandler(SmsMessage message) async {
       message: message,
       destinationNumbers: numbers,
     );
-    final logs = [...newEntries, ...settings.forwardingLogs]
-        .take(maxLogEntries)
-        .toList();
+    final logs = [
+      ...newEntries,
+      ...settings.forwardingLogs,
+    ].take(maxLogEntries).toList();
     await settings.saveLogs(logs);
     appLog('[SMS] BG: done, ${newEntries.length} entries logged');
   } catch (e, stack) {
@@ -134,7 +141,9 @@ Future<void> backgroundSmsEntryPoint() async {
       return;
     }
     appLog('[SMS] backgroundSmsEntryPoint: from=$address body=$body');
-    await backgroundMessageHandler(makeSmsMessage(address: address, body: body));
+    await backgroundMessageHandler(
+      makeSmsMessage(address: address, body: body),
+    );
   } catch (e, stack) {
     appLog('[SMS] BG ERROR in backgroundSmsEntryPoint: $e\n$stack');
   }

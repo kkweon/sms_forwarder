@@ -38,8 +38,9 @@ class SmsForwarderPage extends StatefulWidget {
 
 class _SmsForwarderPageState extends State<SmsForwarderPage>
     with WidgetsBindingObserver {
-  static const _methodChannel =
-      MethodChannel('dev.kkweon.sms_forwarder/telephony');
+  static const _methodChannel = MethodChannel(
+    'dev.kkweon.sms_forwarder/telephony',
+  );
 
   late final SmsService _smsService;
 
@@ -120,7 +121,8 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
       _forwardingLogs = settings.forwardingLogs;
     });
     appLog(
-        '[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers');
+      '[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers',
+    );
     if (_permissionsGranted) _startListening();
   }
 
@@ -129,7 +131,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
     try {
       final numbers =
           await _methodChannel.invokeListMethod<String>('getOwnPhoneNumbers') ??
-              [];
+          [];
       if (!mounted) return;
       setState(() {
         _ownNumbers = numbers
@@ -150,7 +152,8 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
 
   void _onMessage(SmsMessage message) async {
     appLog(
-        '[SMS] FG handler fired: from=${message.address} body=${message.body}');
+      '[SMS] FG handler fired: from=${message.address} body=${message.body}',
+    );
     try {
       if (!_forwardingEnabled) {
         appLog('[SMS] FG: forwarding disabled, skipping');
@@ -179,9 +182,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
         message: message,
         destinationNumbers: _destinationNumbers,
       ).then((newEntries) async {
-        final logs = [...newEntries, ..._forwardingLogs]
-            .take(maxLogEntries)
-            .toList();
+        final logs = [
+          ...newEntries,
+          ..._forwardingLogs,
+        ].take(maxLogEntries).toList();
         await _settings!.saveLogs(logs);
         if (!mounted) return;
         setState(() => _forwardingLogs = logs);
@@ -196,7 +200,9 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
     final normalized = normalizePhone(_phoneController.text);
     if (normalized == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid number — need at least 7 digits')),
+        const SnackBar(
+          content: Text('Invalid number — need at least 7 digits'),
+        ),
       );
       return;
     }
@@ -204,15 +210,16 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Cannot add your own number — this would create a forwarding loop'),
+            'Cannot add your own number — this would create a forwarding loop',
+          ),
         ),
       );
       return;
     }
     if (_destinationNumbers.contains(normalized)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Number already added')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Number already added')));
       _phoneController.clear();
       return;
     }
@@ -273,10 +280,13 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                 title: const Text(
                   'Forwarding loop detected',
                   style: TextStyle(
-                      color: Colors.red, fontWeight: FontWeight.bold),
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 subtitle: const Text(
-                    'Forwarding was automatically disabled to prevent a loop.'),
+                  'Forwarding was automatically disabled to prevent a loop.',
+                ),
                 trailing: TextButton(
                   onPressed: _resetLoop,
                   child: const Text('Reset'),
@@ -289,9 +299,11 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                 _permissionsGranted ? Icons.check_circle : Icons.error,
                 color: _permissionsGranted ? Colors.green : Colors.red,
               ),
-              title: Text(_permissionsGranted
-                  ? 'SMS permissions granted'
-                  : 'SMS permissions required'),
+              title: Text(
+                _permissionsGranted
+                    ? 'SMS permissions granted'
+                    : 'SMS permissions required',
+              ),
               trailing: _permissionsGranted
                   ? null
                   : ElevatedButton(
@@ -322,8 +334,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Detection Keywords',
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    'Detection Keywords',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -348,8 +362,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Destination Numbers',
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    'Destination Numbers',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -374,8 +390,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                   if (_destinationNumbers.isEmpty)
                     const Padding(
                       padding: EdgeInsets.only(top: 8),
-                      child: Text('No numbers added yet',
-                          style: TextStyle(color: Colors.grey)),
+                      child: Text(
+                        'No numbers added yet',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     )
                   else
                     ...List.generate(
@@ -403,8 +421,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Forwarding Log',
-                          style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        'Forwarding Log',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                       if (_forwardingLogs.isNotEmpty)
                         TextButton(
                           onPressed: _clearLogs,
@@ -413,36 +433,34 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                     ],
                   ),
                   if (_forwardingLogs.isEmpty)
-                    const Text('No messages forwarded yet',
-                        style: TextStyle(color: Colors.grey))
+                    const Text(
+                      'No messages forwarded yet',
+                      style: TextStyle(color: Colors.grey),
+                    )
                   else
-                    ...List.generate(
-                      _forwardingLogs.length,
-                      (i) {
-                        final entry = _forwardingLogs[i];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(
-                            entry.failed
-                                ? Icons.error_outline
-                                : Icons.check_circle_outline,
-                            color: entry.failed ? Colors.red : Colors.green,
-                            size: 20,
-                          ),
-                          title:
-                              Text('From: ${entry.from}  →  ${entry.to}'),
-                          subtitle: Text(
-                            entry.body,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: Text(
-                            formatTime(entry.time),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        );
-                      },
-                    ),
+                    ...List.generate(_forwardingLogs.length, (i) {
+                      final entry = _forwardingLogs[i];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          entry.failed
+                              ? Icons.error_outline
+                              : Icons.check_circle_outline,
+                          color: entry.failed ? Colors.red : Colors.green,
+                          size: 20,
+                        ),
+                        title: Text('From: ${entry.from}  →  ${entry.to}'),
+                        subtitle: Text(
+                          entry.body,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          formatTime(entry.time),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      );
+                    }),
                 ],
               ),
             ),

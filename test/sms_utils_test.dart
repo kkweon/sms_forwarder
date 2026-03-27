@@ -37,9 +37,15 @@ void main() {
       expect(normalizePhone('+12025550123'), '+12025550123');
     });
 
-    test('10-digit local and +1 number normalize to same value (regression: duplicate bug)', () {
-      expect(normalizePhone('2025550123'), equals(normalizePhone('+12025550123')));
-    });
+    test(
+      '10-digit local and +1 number normalize to same value (regression: duplicate bug)',
+      () {
+        expect(
+          normalizePhone('2025550123'),
+          equals(normalizePhone('+12025550123')),
+        );
+      },
+    );
 
     test('strips formatting characters', () {
       expect(normalizePhone('(202) 555-0123'), '+12025550123');
@@ -64,7 +70,10 @@ void main() {
 
   group('containsVerificationCode', () {
     test('matches standard OTP/verification messages', () {
-      expect(containsVerificationCode('Your verification code is 123456'), isTrue);
+      expect(
+        containsVerificationCode('Your verification code is 123456'),
+        isTrue,
+      );
       expect(containsVerificationCode('Your OTP is 5678'), isTrue);
       expect(containsVerificationCode('Use code 12345678 to verify'), isTrue);
       expect(containsVerificationCode('[AppName] Your code: 9012'), isTrue);
@@ -78,7 +87,10 @@ void main() {
 
     test('rejects messages with no keyword', () {
       expect(containsVerificationCode('Hello, how are you?'), isFalse);
-      expect(containsVerificationCode('Your order #12345 has shipped'), isFalse);
+      expect(
+        containsVerificationCode('Your order #12345 has shipped'),
+        isFalse,
+      );
       expect(containsVerificationCode('Meeting at 3pm tomorrow'), isFalse);
       expect(containsVerificationCode('Call me at 1234567'), isFalse);
     });

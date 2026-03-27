@@ -46,3 +46,14 @@ flutter install \
 | `another_telephony` | Receive and send SMS (background-capable) |
 | `permission_handler` | Request SMS permissions at runtime |
 | `shared_preferences` | Persist settings and log |
+
+## Development
+
+Install [Lefthook](https://github.com/evilmartians/lefthook), then:
+
+```bash
+flutter pub get
+lefthook install
+```
+
+This installs git hooks that run `dart format`, `dart analyze`, and `flutter test` on every commit.
