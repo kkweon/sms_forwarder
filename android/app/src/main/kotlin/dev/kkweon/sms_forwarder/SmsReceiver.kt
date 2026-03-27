@@ -10,6 +10,7 @@ import android.util.Log
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
+import io.flutter.plugins.GeneratedPluginRegistrant
 
 /**
  * Replaces another_telephony's IncomingSmsReceiver.
@@ -89,6 +90,7 @@ class SmsReceiver : BroadcastReceiver() {
                             context.applicationContext, null
                         )
                         val engine = FlutterEngine(context.applicationContext)
+                        GeneratedPluginRegistrant.registerWith(engine)
                         engine.dartExecutor.executeDartEntrypoint(
                             DartExecutor.DartEntrypoint(
                                 loader.findAppBundlePath(),
