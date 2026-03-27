@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'app_log.dart';
+import 'file_logger.dart';
 import 'sms_forwarder_page.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  final logger = await FileLogger.init();
+  initAppLog(logger);
+  appLog('[SMS] app started');
+  runApp(MyApp(logger: logger));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.logger});
+
+  final FileLogger logger;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +25,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const SmsForwarderPage(),
+      home: SmsForwarderPage(logger: logger),
     );
   }
 }

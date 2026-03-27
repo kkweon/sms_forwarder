@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.util.Log
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
@@ -32,6 +33,10 @@ import io.flutter.embedding.engine.dart.DartExecutor
  */
 class SmsReceiver : BroadcastReceiver() {
 
+    companion object {
+        private const val TAG = "SmsForwarder"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
@@ -42,19 +47,25 @@ class SmsReceiver : BroadcastReceiver() {
 
         val address = messages[0].originatingAddress ?: ""
         val body = messages.joinToString("") { it.messageBody ?: "" }
-        if (body.isBlank()) return
+        Log.d(TAG, "SMS received from=$address bodyLen=${body.length}")
+        if (body.isBlank()) {
+            Log.d(TAG, "SMS body is blank, ignoring")
+            return
+        }
 
         val data = mapOf("address" to address, "body" to body)
 
         // Foreground path: deliver directly via the live EventChannel sink.
         // The sink is non-null only while the Flutter UI is in the foreground.
         SmsEventChannel.sink?.let { sink ->
+            Log.d(TAG, "Delivering via foreground EventChannel sink")
             sink.success(data)
             return
         }
 
         // Background path: write to SharedPreferences then start a headless
         // FlutterEngine that runs backgroundSmsEntryPoint() in Dart.
+        Log.d(TAG, "No foreground sink — starting background FlutterEngine")
         val pendingResult = goAsync() // extends the onReceive window to ~60s
         Thread {
             try {
@@ -67,6 +78,7 @@ class SmsReceiver : BroadcastReceiver() {
                     .putString("flutter.pending_bg_sms_address", address)
                     .putString("flutter.pending_bg_sms_body", body)
                     .apply()
+                Log.d(TAG, "Wrote pending SMS to SharedPreferences")
 
                 // FlutterEngine must be created on the main thread.
                 Handler(Looper.getMainLooper()).post {
@@ -83,6 +95,12 @@ class SmsReceiver : BroadcastReceiver() {
                                 "backgroundSmsEntryPoint"
                             )
                         )
+                        Log.d(TAG, "Headless FlutterEngine started for backgroundSmsEntryPoint")
+                        // Destroy the engine after 60 s to free resources.
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            engine.destroy()
+                            Log.d(TAG, "Headless FlutterEngine destroyed")
+                        }, 60_000)
                         // The engine runs backgroundSmsEntryPoint asynchronously.
                         // pendingResult.finish() signals that BroadcastReceiver
                         // setup is done; the engine continues independently.
@@ -91,6 +109,7 @@ class SmsReceiver : BroadcastReceiver() {
                     }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Error in background SMS handling: ${e.message}", e)
                 pendingResult.finish()
             }
         }.start()

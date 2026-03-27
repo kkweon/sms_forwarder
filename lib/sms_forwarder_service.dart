@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_log.dart';
+import 'file_logger.dart';
 import 'log_entry.dart';
 import 'loop_detector.dart';
 import 'real_sms_service.dart';
@@ -38,7 +40,7 @@ Future<List<LogEntry>> forwardSms({
       message: forwardText,
       isMultipart: true,
       statusListener: (SendStatus status) {
-        debugPrint('[SMS] send to $number status=$status');
+        appLog('[SMS] send to $number status=$status');
         pendingEntries[number] = LogEntry(
           time: now,
           from: from,
@@ -54,7 +56,7 @@ Future<List<LogEntry>> forwardSms({
   await Future.wait(completers.entries.map((e) => e.value.future.timeout(
     Duration(seconds: _sendTimeoutSeconds),
     onTimeout: () {
-      debugPrint('[SMS] timeout waiting for status from ${e.key}');
+      appLog('[SMS] timeout waiting for status from ${e.key}');
       pendingEntries[e.key] = LogEntry(
         time: now,
         from: from,
@@ -70,39 +72,44 @@ Future<List<LogEntry>> forwardSms({
 
 @pragma('vm:entry-point')
 Future<void> backgroundMessageHandler(SmsMessage message) async {
-  debugPrint('[SMS] BG handler fired: from=${message.address} body=${message.body}');
-  final settings = await SettingsService.load();
-  if (!settings.forwardingEnabled) {
-    debugPrint('[SMS] BG: forwarding disabled, skipping');
-    return;
+  appLog('[SMS] BG handler fired: from=${message.address} body=${message.body}');
+  try {
+    final settings = await SettingsService.load();
+    if (!settings.forwardingEnabled) {
+      appLog('[SMS] BG: forwarding disabled, skipping');
+      return;
+    }
+    final body = preprocessBody(message.body ?? '');
+    if (!containsVerificationCode(body)) {
+      appLog('[SMS] BG: no keyword match, skipping. body="$body"');
+      return;
+    }
+    final numbers = settings.destinationNumbers;
+    if (numbers.isEmpty) {
+      appLog('[SMS] BG: no destination numbers, skipping');
+      return;
+    }
+    final loopDetector = await LoopDetector.load();
+    if (await loopDetector.countForward(
+      onLoopDetected: () => settings.setForwardingEnabled(false),
+    )) {
+      appLog('[SMS] BG: loop detected, aborting forward');
+      return;
+    }
+    appLog('[SMS] BG: forwarding to $numbers');
+    final newEntries = await forwardSms(
+      smsService: RealSmsService(telephony: Telephony.backgroundInstance),
+      message: message,
+      destinationNumbers: numbers,
+    );
+    final logs = [...newEntries, ...settings.forwardingLogs]
+        .take(maxLogEntries)
+        .toList();
+    await settings.saveLogs(logs);
+    appLog('[SMS] BG: done, ${newEntries.length} entries logged');
+  } catch (e, stack) {
+    appLog('[SMS] BG ERROR in backgroundMessageHandler: $e\n$stack');
   }
-  final body = preprocessBody(message.body ?? '');
-  if (!containsVerificationCode(body)) {
-    debugPrint('[SMS] BG: no keyword match, skipping');
-    return;
-  }
-  final numbers = settings.destinationNumbers;
-  if (numbers.isEmpty) {
-    debugPrint('[SMS] BG: no destination numbers, skipping');
-    return;
-  }
-  final loopDetector = await LoopDetector.load();
-  if (await loopDetector.countForward(
-    onLoopDetected: () => settings.setForwardingEnabled(false),
-  )) {
-    debugPrint('[SMS] BG: loop detected, aborting forward');
-    return;
-  }
-  debugPrint('[SMS] BG: forwarding to $numbers');
-  final newEntries = await forwardSms(
-    smsService: RealSmsService(telephony: Telephony.backgroundInstance),
-    message: message,
-    destinationNumbers: numbers,
-  );
-  final logs = [...newEntries, ...settings.forwardingLogs]
-      .take(maxLogEntries)
-      .toList();
-  await settings.saveLogs(logs);
 }
 
 /// Entry point for the headless [FlutterEngine] started by [SmsReceiver.kt]
@@ -114,12 +121,21 @@ Future<void> backgroundMessageHandler(SmsMessage message) async {
 @pragma('vm:entry-point')
 Future<void> backgroundSmsEntryPoint() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-  final address = prefs.getString('pending_bg_sms_address');
-  final body = prefs.getString('pending_bg_sms_body');
-  await prefs.remove('pending_bg_sms_address');
-  await prefs.remove('pending_bg_sms_body');
-  if (body == null || body.isEmpty) return;
-  debugPrint('[SMS] backgroundSmsEntryPoint: from=$address body=$body');
-  await backgroundMessageHandler(makeSmsMessage(address: address, body: body));
+  final logger = await FileLogger.init();
+  initAppLog(logger);
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final address = prefs.getString('pending_bg_sms_address');
+    final body = prefs.getString('pending_bg_sms_body');
+    await prefs.remove('pending_bg_sms_address');
+    await prefs.remove('pending_bg_sms_body');
+    if (body == null || body.isEmpty) {
+      appLog('[SMS] backgroundSmsEntryPoint: no pending SMS found');
+      return;
+    }
+    appLog('[SMS] backgroundSmsEntryPoint: from=$address body=$body');
+    await backgroundMessageHandler(makeSmsMessage(address: address, body: body));
+  } catch (e, stack) {
+    appLog('[SMS] BG ERROR in backgroundSmsEntryPoint: $e\n$stack');
+  }
 }

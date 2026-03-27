@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_log.dart';
 
 const _recentForwardsKey = 'recent_forwards';
 const _loopWindowMs = 60 * 1000; // 60 seconds
@@ -31,7 +32,7 @@ class LoopDetector {
     if (recent.length >= _loopThreshold) {
       await _prefs.setBool(_prefsLoopDetected, true);
       await _prefs.remove(_recentForwardsKey);
-      debugPrint('[SMS] Loop detected (${recent.length} forwards in ${_loopWindowMs ~/ 1000}s)');
+      appLog('[SMS] Loop detected (${recent.length} forwards in ${_loopWindowMs ~/ 1000}s)');
       await onLoopDetected();
       return true;
     }

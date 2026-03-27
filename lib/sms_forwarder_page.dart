@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:another_telephony/telephony.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'app_log.dart';
+import 'debug_log_page.dart';
+import 'file_logger.dart';
 import 'log_entry.dart';
 import 'loop_detector.dart';
 import 'real_sms_service.dart';
@@ -16,6 +19,7 @@ class SmsForwarderPage extends StatefulWidget {
     super.key,
     this.smsService,
     this.permissionsGrantedOverride,
+    this.logger,
   });
 
   /// Injected [SmsService] for tests. Defaults to [RealSmsService] in production.
@@ -24,6 +28,9 @@ class SmsForwarderPage extends StatefulWidget {
   /// When non-null, overrides the Android permission check result.
   /// Set to `true` in widget tests to bypass [permission_handler].
   final bool? permissionsGrantedOverride;
+
+  /// Injected [FileLogger] for production. Null in tests.
+  final FileLogger? logger;
 
   @override
   State<SmsForwarderPage> createState() => _SmsForwarderPageState();
@@ -80,7 +87,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
     }
     final sms = await Permission.sms.status;
     final phone = await Permission.phone.status;
-    debugPrint('[SMS] permissions: sms=${sms.name} phone=${phone.name}');
+    appLog('[SMS] permissions: sms=${sms.name} phone=${phone.name}');
     if (!mounted) return;
     setState(() {
       _permissionsGranted = sms.isGranted && phone.isGranted;
@@ -112,7 +119,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
       _destinationNumbers = normalizedNumbers;
       _forwardingLogs = settings.forwardingLogs;
     });
-    debugPrint(
+    appLog(
         '[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers');
     if (_permissionsGranted) _startListening();
   }
@@ -130,54 +137,59 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
             .whereType<String>()
             .toList();
       });
-      debugPrint('[SMS] own numbers: $_ownNumbers');
+      appLog('[SMS] own numbers: $_ownNumbers');
     } catch (e) {
-      debugPrint('[SMS] Could not get own phone numbers: $e');
+      appLog('[SMS] Could not get own phone numbers: $e');
     }
   }
 
   void _startListening() {
-    debugPrint('[SMS] startListening called');
+    appLog('[SMS] startListening called');
     _smsService.startListening(_onMessage);
   }
 
   void _onMessage(SmsMessage message) async {
-    debugPrint(
+    appLog(
         '[SMS] FG handler fired: from=${message.address} body=${message.body}');
-    if (!_forwardingEnabled) {
-      debugPrint('[SMS] FG: forwarding disabled, skipping');
-      return;
-    }
-    final body = preprocessBody(message.body ?? '');
-    if (!containsVerificationCode(body)) {
-      debugPrint('[SMS] FG: no keyword match, skipping');
-      return;
-    }
-    final loopDetected = await _loopDetector!.countForward(
-      onLoopDetected: () => _settings!.setForwardingEnabled(false),
-    );
-    if (loopDetected) {
-      if (!mounted) return;
-      setState(() {
-        _forwardingEnabled = false;
-        _loopDetected = true;
+    try {
+      if (!_forwardingEnabled) {
+        appLog('[SMS] FG: forwarding disabled, skipping');
+        return;
+      }
+      final body = preprocessBody(message.body ?? '');
+      if (!containsVerificationCode(body)) {
+        appLog('[SMS] FG: no keyword match, skipping. body="$body"');
+        return;
+      }
+      final loopDetected = await _loopDetector!.countForward(
+        onLoopDetected: () => _settings!.setForwardingEnabled(false),
+      );
+      if (loopDetected) {
+        if (!mounted) return;
+        setState(() {
+          _forwardingEnabled = false;
+          _loopDetected = true;
+        });
+        appLog('[SMS] FG: loop detected, aborting forward');
+        return;
+      }
+      appLog('[SMS] FG: forwarding to $_destinationNumbers');
+      forwardSms(
+        smsService: _smsService,
+        message: message,
+        destinationNumbers: _destinationNumbers,
+      ).then((newEntries) async {
+        final logs = [...newEntries, ..._forwardingLogs]
+            .take(maxLogEntries)
+            .toList();
+        await _settings!.saveLogs(logs);
+        if (!mounted) return;
+        setState(() => _forwardingLogs = logs);
+        appLog('[SMS] FG: done, ${newEntries.length} entries logged');
       });
-      debugPrint('[SMS] FG: loop detected, aborting forward');
-      return;
+    } catch (e, stack) {
+      appLog('[SMS] FG ERROR in _onMessage: $e\n$stack');
     }
-    debugPrint('[SMS] FG: forwarding to $_destinationNumbers');
-    forwardSms(
-      smsService: _smsService,
-      message: message,
-      destinationNumbers: _destinationNumbers,
-    ).then((newEntries) async {
-      final logs = [...newEntries, ..._forwardingLogs]
-          .take(maxLogEntries)
-          .toList();
-      await _settings!.saveLogs(logs);
-      if (!mounted) return;
-      setState(() => _forwardingLogs = logs);
-    });
   }
 
   void _addNumber() {
@@ -236,6 +248,19 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
       appBar: AppBar(
         title: const Text('SMS Forwarder'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          if (widget.logger != null)
+            IconButton(
+              icon: const Icon(Icons.bug_report_outlined),
+              tooltip: 'Debug log',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DebugLogPage(logger: widget.logger!),
+                ),
+              ),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
