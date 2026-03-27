@@ -17,7 +17,10 @@ class FileLogger {
   FileLogger._(this._file);
 
   static Future<FileLogger> init() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dirs = await getExternalStorageDirectories();
+    final dir = (dirs != null && dirs.isNotEmpty)
+        ? dirs.first
+        : await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/$_logFileName');
     return FileLogger._(file);
   }

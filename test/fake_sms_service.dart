@@ -7,30 +7,15 @@ class RecordedSend {
   RecordedSend(this.to, this.message);
 }
 
-/// Fake [SmsService] for widget and integration tests.
+/// Fake [SmsService] for tests.
 ///
-/// Call [inject] to simulate an incoming SMS message.
 /// Inspect [sent] to verify outgoing SMS sends.
 /// Pass [statusToReport] to simulate send failures.
 class FakeSmsService implements SmsService {
-  void Function(SmsMessage)? _listener;
   final List<RecordedSend> sent = [];
   final SendStatus statusToReport;
 
   FakeSmsService({this.statusToReport = SendStatus.SENT});
-
-  /// Simulates an incoming SMS arriving on the device.
-  void inject(SmsMessage message) => _listener?.call(message);
-
-  @override
-  void startListening(void Function(SmsMessage) onMessage) {
-    _listener = onMessage;
-  }
-
-  @override
-  void stopListening() {
-    _listener = null;
-  }
 
   @override
   Future<void> sendSms({

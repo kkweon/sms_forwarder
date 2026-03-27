@@ -6,7 +6,6 @@ import android.telephony.TelephonyManager
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
@@ -18,7 +17,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        Log.d(TAG, "configureFlutterEngine: registering MethodChannel + EventChannel")
+        Log.d(TAG, "configureFlutterEngine: registering MethodChannel")
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -26,19 +25,6 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
-        EventChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            "dev.kkweon.sms_forwarder/sms_events"
-        ).setStreamHandler(object : EventChannel.StreamHandler {
-            override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
-                Log.d(TAG, "EventChannel: onListen — foreground sink active")
-                SmsEventChannel.sink = events
-            }
-            override fun onCancel(arguments: Any?) {
-                Log.d(TAG, "EventChannel: onCancel — foreground sink cleared")
-                SmsEventChannel.sink = null
-            }
-        })
     }
 
     @SuppressLint("HardwareIds", "MissingPermission")

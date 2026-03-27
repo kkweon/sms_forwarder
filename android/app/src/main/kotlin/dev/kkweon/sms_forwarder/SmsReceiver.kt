@@ -13,24 +13,18 @@ import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugins.GeneratedPluginRegistrant
 
 /**
- * Replaces another_telephony's IncomingSmsReceiver.
+ * Manifest-registered BroadcastReceiver for SMS_RECEIVED.
+ *
+ * Fires for every incoming SMS regardless of whether the app is running.
+ * Always uses the background path: writes SMS data to SharedPreferences
+ * (with the "flutter." prefix so Dart's shared_preferences package reads it),
+ * then starts a headless FlutterEngine with the backgroundSmsEntryPoint Dart
+ * entry point, which reads and forwards the pending SMS.
  *
  * Root-cause fix: another_telephony v0.4.1 calls the deprecated
- * SmsMessage.createFromPdu(byte[]) without a format string. On LTE networks
- * the SMS_RECEIVED intent carries a "format" extra ("3gpp"/"3gpp2") that must
- * be passed to createFromPdu(pdu, format); without it the method returns null
- * for some PDU encodings, causing message.body to be null in Dart.
- *
- * Telephony.Sms.Intents.getMessagesFromIntent() reads the format string from
- * intent extras and calls the correct overload, fixing the null-body bug.
- * This is the correct Android API (API 19+) for receiving SMS broadcasts.
- *
- * Foreground path: live EventChannel sink (SmsEventChannel.sink) set by
- *   MainActivity when the Flutter UI is active.
- * Background path: pending SMS data is written to SharedPreferences (with the
- *   "flutter." key prefix so Dart's shared_preferences package reads it), then
- *   a fresh headless FlutterEngine is started with the backgroundSmsEntryPoint
- *   Dart entry point, which reads and forwards the pending SMS.
+ * SmsMessage.createFromPdu(byte[]) without a format string, causing null
+ * message bodies on LTE networks. Telephony.Sms.Intents.getMessagesFromIntent()
+ * reads the "format" extra and calls the correct overload.
  */
 class SmsReceiver : BroadcastReceiver() {
 
@@ -41,8 +35,6 @@ class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
-        // KEY FIX: getMessagesFromIntent reads the "format" extra and calls
-        // createFromPdu(pdu, format), avoiding the null-body bug.
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             ?.takeIf { it.isNotEmpty() } ?: return
 
@@ -54,19 +46,9 @@ class SmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val data = mapOf("address" to address, "body" to body)
-
-        // Foreground path: deliver directly via the live EventChannel sink.
-        // The sink is non-null only while the Flutter UI is in the foreground.
-        SmsEventChannel.sink?.let { sink ->
-            Log.d(TAG, "Delivering via foreground EventChannel sink")
-            sink.success(data)
-            return
-        }
-
-        // Background path: write to SharedPreferences then start a headless
-        // FlutterEngine that runs backgroundSmsEntryPoint() in Dart.
-        Log.d(TAG, "No foreground sink — starting background FlutterEngine")
+        // Always use the background path: write to SharedPreferences then start
+        // a headless FlutterEngine that runs backgroundSmsEntryPoint() in Dart.
+        Log.d(TAG, "Starting background FlutterEngine")
         val pendingResult = goAsync() // extends the onReceive window to ~60s
         Thread {
             try {

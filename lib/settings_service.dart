@@ -46,4 +46,8 @@ class SettingsService {
   );
 
   Future<void> clearLogs() => _prefs.remove(_prefsForwardingLog);
+
+  /// Re-reads SharedPreferences from disk, picking up writes made by the
+  /// background headless FlutterEngine since this instance was last loaded.
+  Future<void> reload() => _prefs.reload();
 }
