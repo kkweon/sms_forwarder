@@ -88,6 +88,8 @@ class SmsReceiver : BroadcastReceiver() {
                         // The engine runs backgroundSmsEntryPoint asynchronously.
                         // pendingResult.finish() signals that BroadcastReceiver
                         // setup is done; the engine continues independently.
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to start headless FlutterEngine: ${e.message}", e)
                     } finally {
                         pendingResult.finish()
                     }

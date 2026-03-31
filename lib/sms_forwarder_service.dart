@@ -1,11 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
 import 'package:another_telephony/telephony.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_log.dart';
-import 'file_logger.dart';
 import 'log_entry.dart';
 import 'loop_detector.dart';
 import 'real_sms_service.dart';
@@ -116,35 +113,5 @@ Future<void> backgroundMessageHandler(SmsMessage message) async {
     appLog('[SMS] BG: done, ${newEntries.length} entries logged');
   } catch (e, stack) {
     appLog('[SMS] BG ERROR in backgroundMessageHandler: $e\n$stack');
-  }
-}
-
-/// Entry point for the headless [FlutterEngine] started by [SmsReceiver.kt]
-/// when the app is in the background.
-///
-/// Reads the pending SMS that [SmsReceiver.kt] wrote to [SharedPreferences]
-/// (with the `flutter.` key prefix so this package can read them directly),
-/// then delegates to [backgroundMessageHandler].
-@pragma('vm:entry-point')
-Future<void> backgroundSmsEntryPoint() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final logger = await FileLogger.init();
-  initAppLog(logger);
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final address = prefs.getString('pending_bg_sms_address');
-    final body = prefs.getString('pending_bg_sms_body');
-    await prefs.remove('pending_bg_sms_address');
-    await prefs.remove('pending_bg_sms_body');
-    if (body == null || body.isEmpty) {
-      appLog('[SMS] backgroundSmsEntryPoint: no pending SMS found');
-      return;
-    }
-    appLog('[SMS] backgroundSmsEntryPoint: from=$address body=$body');
-    await backgroundMessageHandler(
-      makeSmsMessage(address: address, body: body),
-    );
-  } catch (e, stack) {
-    appLog('[SMS] BG ERROR in backgroundSmsEntryPoint: $e\n$stack');
   }
 }
