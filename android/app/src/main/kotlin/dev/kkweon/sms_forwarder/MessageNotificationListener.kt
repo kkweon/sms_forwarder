@@ -12,6 +12,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.EventChannel
+import io.flutter.plugins.GeneratedPluginRegistrant
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 
@@ -119,6 +120,10 @@ class MessageNotificationListener : NotificationListenerService() {
         if (engine == null) {
             Log.d(TAG, "creating cached FlutterEngine")
             engine = FlutterEngine(applicationContext)
+            // Register all Flutter plugins before executing the entrypoint
+            // so that platform channels (e.g. another_telephony, shared_preferences,
+            // permission_handler) are wired up when Dart starts.
+            GeneratedPluginRegistrant.registerWith(engine)
             engine.dartExecutor.executeDartEntrypoint(
                 DartExecutor.DartEntrypoint.createDefault()
             )
