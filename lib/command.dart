@@ -1,6 +1,6 @@
-import 'package:another_telephony/telephony.dart';
+import 'incoming_message.dart';
 
-/// What the planner decides to do for a single incoming SMS.
+/// What the planner decides to do for a single incoming message.
 /// Every command carries the [log] string the handler should write
 /// before/while executing it.
 sealed class Command {
@@ -8,10 +8,10 @@ sealed class Command {
   const Command(this.log);
 }
 
-/// The SMS matched all filters; forward it to [destinations] and record
+/// The message matched all filters; forward it to [destinations] and record
 /// the attempt timestamp in the loop detector.
 class ForwardCommand extends Command {
-  final SmsMessage message;
+  final IncomingMessage message;
   final List<String> destinations;
   final int attemptTimestampMs;
   const ForwardCommand({
@@ -28,7 +28,7 @@ class DisableForwardingCommand extends Command {
   const DisableForwardingCommand(super.log);
 }
 
-/// The SMS did not match (forwarding off, no keyword, no destinations).
+/// The message did not match (forwarding off, no keyword, no destinations).
 /// Carries the reason for the debug log; no side effects.
 class NoActionCommand extends Command {
   const NoActionCommand(super.log);

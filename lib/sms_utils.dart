@@ -1,11 +1,3 @@
-import 'package:another_telephony/telephony.dart';
-
-SmsMessage makeSmsMessage({String? address, String? body}) =>
-    SmsMessage.fromMap( // ignore: invalid_use_of_visible_for_testing_member
-      {'address': address, 'body': body},
-      [SmsColumn.ADDRESS, SmsColumn.BODY],
-    );
-
 const keywords = ['verif', 'code', 'otp', 'passcode', 'pin', 'auth', 'confirm'];
 
 /// Normalizes a phone number to E.164-like form for consistent storage and comparison.

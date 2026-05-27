@@ -42,3 +42,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // NotificationCompat / NotificationManagerCompat used by the notification listener service.
+    implementation("androidx.core:core-ktx:1.13.1")
+}

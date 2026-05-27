@@ -2,10 +2,10 @@ import 'package:another_telephony/telephony.dart';
 
 import 'sms_service.dart';
 
-/// Production [SmsService] backed by a [Telephony] instance for sending.
-///
-/// Pass [telephony] explicitly to use [Telephony.backgroundInstance] in
-/// background isolates; omit to default to [Telephony.instance].
+/// Production [SmsService] backed by [Telephony.instance] for outgoing
+/// sends. All forwarding now runs in the main isolate (hosted by the
+/// notification-listener service's cached FlutterEngine), so there is no
+/// separate background instance to choose between.
 class RealSmsService implements SmsService {
   final Telephony _telephony;
 

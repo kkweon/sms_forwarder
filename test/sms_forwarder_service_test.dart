@@ -1,9 +1,12 @@
 import 'package:another_telephony/telephony.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sms_forwarder/incoming_message.dart';
 import 'package:sms_forwarder/sms_forwarder_service.dart';
-import 'package:sms_forwarder/sms_utils.dart';
 
 import 'fake_sms_service.dart';
+
+IncomingMessage _msg({String? address, String? body}) =>
+    IncomingMessage(address: address, body: body);
 
 void main() {
   group('forwardSms', () {
@@ -13,7 +16,7 @@ void main() {
         final fake = FakeSmsService();
         final entries = await forwardSms(
           smsService: fake,
-          message: makeSmsMessage(address: 'BofA', body: 'Code 1234.'),
+          message: _msg(address: 'BofA', body: 'Code 1234.'),
           destinationNumbers: ['+12025550123'],
         );
 
@@ -31,7 +34,7 @@ void main() {
         final fake = FakeSmsService();
         final entries = await forwardSms(
           smsService: fake,
-          message: makeSmsMessage(address: 'BofA', body: 'Code 1234.'),
+          message: _msg(address: 'BofA', body: 'Code 1234.'),
           destinationNumbers: ['+12025550123', '+19998887777', '+13335554444'],
         );
 
@@ -49,7 +52,7 @@ void main() {
       final fake = FakeSmsService();
       await forwardSms(
         smsService: fake,
-        message: makeSmsMessage(address: 'BofA', body: 'Code 1234.'),
+        message: _msg(address: 'BofA', body: 'Code 1234.'),
         destinationNumbers: ['+12025550123'],
       );
 
@@ -62,10 +65,7 @@ void main() {
         final fake = FakeSmsService();
         final entries = await forwardSms(
           smsService: fake,
-          message: makeSmsMessage(
-            address: 'BofA',
-            body: '<#>Code 1234. 3olHr09B9Po',
-          ),
+          message: _msg(address: 'BofA', body: '<#>Code 1234. 3olHr09B9Po'),
           destinationNumbers: ['+12025550123'],
         );
 
@@ -79,7 +79,7 @@ void main() {
       final fake = FakeSmsService();
       final entries = await forwardSms(
         smsService: fake,
-        message: makeSmsMessage(address: null, body: 'Code 1234.'),
+        message: _msg(address: null, body: 'Code 1234.'),
         destinationNumbers: ['+12025550123'],
       );
 
@@ -91,7 +91,7 @@ void main() {
       final fake = FakeSmsService();
       final entries = await forwardSms(
         smsService: fake,
-        message: makeSmsMessage(address: 'BofA', body: 'Code 1234.'),
+        message: _msg(address: 'BofA', body: 'Code 1234.'),
         destinationNumbers: [],
       );
 
@@ -104,7 +104,7 @@ void main() {
       final fake = FakeSmsService(statusToReport: SendStatus.DELIVERED);
       final entries = await forwardSms(
         smsService: fake,
-        message: makeSmsMessage(address: 'BofA', body: 'Code 1234.'),
+        message: _msg(address: 'BofA', body: 'Code 1234.'),
         destinationNumbers: ['+12025550123'],
       );
 

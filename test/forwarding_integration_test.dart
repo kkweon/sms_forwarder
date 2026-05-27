@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sms_forwarder/forward_event.dart';
 import 'package:sms_forwarder/sms_forwarder_page.dart';
 
-/// Pumps [SmsForwarderPage] with permissions pre-granted.
+/// Pumps [SmsForwarderPage] with notification access pre-granted.
 /// [SharedPreferences] must be mocked before calling this.
 Future<void> _buildPage(WidgetTester tester) async {
   // Make the viewport tall enough to render all cards without scrolling.
@@ -14,7 +14,9 @@ Future<void> _buildPage(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   await tester.pumpWidget(
-    const MaterialApp(home: SmsForwarderPage(permissionsGrantedOverride: true)),
+    const MaterialApp(
+      home: SmsForwarderPage(notificationAccessGrantedOverride: true),
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -55,6 +57,24 @@ void main() {
         expect(switchWidget.onChanged, isNotNull);
       },
     );
+
+    testWidgets('toggle stays disabled when notification access not granted', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: SmsForwarderPage(notificationAccessGrantedOverride: false),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Notification access required'), findsOneWidget);
+      final switchWidget = tester.widget<Switch>(find.byType(Switch));
+      expect(switchWidget.onChanged, isNull);
+    });
 
     testWidgets('added destination number appears in the list', (tester) async {
       await _buildPage(tester);

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sms_forwarder/app_state.dart';
 import 'package:sms_forwarder/command.dart';
+import 'package:sms_forwarder/incoming_message.dart';
 import 'package:sms_forwarder/sms_planner.dart';
-import 'package:sms_forwarder/sms_utils.dart';
 
 AppState _state({
   bool forwardingEnabled = true,
@@ -14,8 +14,11 @@ AppState _state({
   recentForwardTimestampsMs: recentForwardTimestampsMs,
 );
 
+IncomingMessage _msg({String? address, String? body}) =>
+    IncomingMessage(address: address, body: body);
+
 void main() {
-  final validSms = makeSmsMessage(address: 'BofA', body: 'Your code is 123456');
+  final validSms = _msg(address: 'BofA', body: 'Your code is 123456');
   final now = DateTime(2026, 1, 1, 12, 0, 0);
   final nowMs = now.millisecondsSinceEpoch;
 
@@ -32,7 +35,7 @@ void main() {
 
     test('no keyword match', () {
       final cmd = planForSms(
-        makeSmsMessage(address: 'X', body: 'See you at 7pm'),
+        _msg(address: 'X', body: 'See you at 7pm'),
         _state(),
         now: now,
       );

@@ -1,18 +1,17 @@
-import 'package:another_telephony/telephony.dart';
-
 import 'app_state.dart';
 import 'command.dart';
+import 'incoming_message.dart';
 import 'sms_utils.dart';
 
 const loopWindowMs = 60 * 1000;
 const loopThreshold = 5;
 
-/// Pure decision function: given an incoming SMS and a snapshot of app
+/// Pure decision function: given an incoming message and a snapshot of app
 /// state, return the single [Command] the handler should execute.
 ///
 /// No I/O, no clock unless [now] is omitted (in which case `DateTime.now()`
 /// is read). Pass [now] from tests for deterministic behavior.
-Command planForSms(SmsMessage msg, AppState state, {DateTime? now}) {
+Command planForSms(IncomingMessage msg, AppState state, {DateTime? now}) {
   if (!state.forwardingEnabled) {
     return const NoActionCommand('forwarding disabled, skipping');
   }
