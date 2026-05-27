@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'app_log.dart';
 import 'debug_log_page.dart';
 import 'file_logger.dart';
-import 'log_entry.dart';
+import 'forward_event.dart';
 import 'loop_detector.dart';
 import 'settings_service.dart';
 import 'sms_utils.dart';
@@ -41,7 +41,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
   bool _loopDetected = false;
   List<String> _destinationNumbers = [];
   List<String> _ownNumbers = [];
-  List<LogEntry> _forwardingLogs = [];
+  List<ForwardEvent> _forwardEvents = [];
   final _phoneController = TextEditingController();
 
   @override
@@ -106,7 +106,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
       _forwardingEnabled = settings.forwardingEnabled;
       _loopDetected = loopDetector.detected;
       _destinationNumbers = normalizedNumbers;
-      _forwardingLogs = settings.forwardingLogs;
+      _forwardEvents = settings.forwardEvents;
     });
     appLog(
       '[SMS] loadSettings: enabled=$_forwardingEnabled permissions=$_permissionsGranted numbers=$_destinationNumbers',
@@ -174,8 +174,8 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
   }
 
   Future<void> _clearLogs() async {
-    setState(() => _forwardingLogs = []);
-    await _settings!.clearLogs();
+    setState(() => _forwardEvents = []);
+    await _settings!.clearForwardEvents();
   }
 
   Future<void> _resetLoop() async {
@@ -365,21 +365,21 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                         'Forwarding Log',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      if (_forwardingLogs.isNotEmpty)
+                      if (_forwardEvents.isNotEmpty)
                         TextButton(
                           onPressed: _clearLogs,
                           child: const Text('Clear'),
                         ),
                     ],
                   ),
-                  if (_forwardingLogs.isEmpty)
+                  if (_forwardEvents.isEmpty)
                     const Text(
                       'No messages forwarded yet',
                       style: TextStyle(color: Colors.grey),
                     )
                   else
-                    ...List.generate(_forwardingLogs.length, (i) {
-                      final entry = _forwardingLogs[i];
+                    ...List.generate(_forwardEvents.length, (i) {
+                      final entry = _forwardEvents[i];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(

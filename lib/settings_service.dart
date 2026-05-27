@@ -2,11 +2,13 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'log_entry.dart';
+import 'forward_event.dart';
 
 const _prefsForwardingEnabled = 'forwarding_enabled';
 const _prefsDestinationNumbers = 'destination_numbers';
-const _prefsForwardingLog = 'forwarding_log';
+// Prefs key kept as 'forwarding_log' to avoid migrating existing users.
+const _prefsForwardEvents = 'forwarding_log';
+const _maxForwardEvents = 50;
 
 class SettingsService {
   final SharedPreferences _prefs;
@@ -23,11 +25,13 @@ class SettingsService {
   List<String> get destinationNumbers =>
       _prefs.getStringList(_prefsDestinationNumbers) ?? [];
 
-  /// Returns log entries newest-first.
-  List<LogEntry> get forwardingLogs {
-    final raw = _prefs.getStringList(_prefsForwardingLog) ?? [];
+  /// Newest-first list of per-recipient forward outcomes.
+  List<ForwardEvent> get forwardEvents {
+    final raw = _prefs.getStringList(_prefsForwardEvents) ?? [];
     return raw
-        .map((e) => LogEntry.fromJson(jsonDecode(e) as Map<String, dynamic>))
+        .map(
+          (e) => ForwardEvent.fromJson(jsonDecode(e) as Map<String, dynamic>),
+        )
         .toList();
   }
 
@@ -39,13 +43,20 @@ class SettingsService {
   Future<void> setDestinationNumbers(List<String> numbers) =>
       _prefs.setStringList(_prefsDestinationNumbers, numbers);
 
-  /// Saves [logs] to persistent storage (newest-first order).
-  Future<void> saveLogs(List<LogEntry> logs) => _prefs.setStringList(
-    _prefsForwardingLog,
-    logs.map((e) => jsonEncode(e.toJson())).toList(),
-  );
+  /// Prepends [newEvents] to the persisted history, capped at the most
+  /// recent [_maxForwardEvents].
+  Future<void> recordForwardEvents(List<ForwardEvent> newEvents) {
+    final merged = [
+      ...newEvents,
+      ...forwardEvents,
+    ].take(_maxForwardEvents).toList();
+    return _prefs.setStringList(
+      _prefsForwardEvents,
+      merged.map((e) => jsonEncode(e.toJson())).toList(),
+    );
+  }
 
-  Future<void> clearLogs() => _prefs.remove(_prefsForwardingLog);
+  Future<void> clearForwardEvents() => _prefs.remove(_prefsForwardEvents);
 
   /// Re-reads SharedPreferences from disk, picking up writes made by the
   /// background headless FlutterEngine since this instance was last loaded.

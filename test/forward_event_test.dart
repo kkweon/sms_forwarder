@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sms_forwarder/log_entry.dart';
+import 'package:sms_forwarder/forward_event.dart';
 
 void main() {
-  const entry = LogEntry(
+  const entry = ForwardEvent(
     time: '2024-01-01T00:00:00.000',
     from: 'BofA',
     to: '+12025550123',
@@ -10,9 +10,9 @@ void main() {
     status: 'sent',
   );
 
-  group('LogEntry toJson / fromJson round-trip', () {
+  group('ForwardEvent toJson / fromJson round-trip', () {
     test('sent', () {
-      final result = LogEntry.fromJson(entry.toJson());
+      final result = ForwardEvent.fromJson(entry.toJson());
       expect(result.time, entry.time);
       expect(result.from, entry.from);
       expect(result.to, entry.to);
@@ -21,29 +21,29 @@ void main() {
     });
 
     test('failed', () {
-      const e = LogEntry(
+      const e = ForwardEvent(
         time: 't',
         from: 'f',
         to: 'to',
         body: 'b',
         status: 'failed',
       );
-      expect(LogEntry.fromJson(e.toJson()).status, 'failed');
+      expect(ForwardEvent.fromJson(e.toJson()).status, 'failed');
     });
 
     test('timeout', () {
-      const e = LogEntry(
+      const e = ForwardEvent(
         time: 't',
         from: 'f',
         to: 'to',
         body: 'b',
         status: 'timeout',
       );
-      expect(LogEntry.fromJson(e.toJson()).status, 'timeout');
+      expect(ForwardEvent.fromJson(e.toJson()).status, 'timeout');
     });
   });
 
-  group('LogEntry toJson', () {
+  group('ForwardEvent toJson', () {
     test('produces expected keys and values', () {
       final json = entry.toJson();
       expect(json.keys, containsAll(['time', 'from', 'to', 'body', 'status']));
@@ -55,13 +55,13 @@ void main() {
     });
   });
 
-  group('LogEntry failed getter', () {
+  group('ForwardEvent failed getter', () {
     test('returns false for sent', () {
       expect(entry.failed, isFalse);
     });
 
     test('returns true for failed', () {
-      const e = LogEntry(
+      const e = ForwardEvent(
         time: 't',
         from: 'f',
         to: 'to',
@@ -72,7 +72,7 @@ void main() {
     });
 
     test('returns true for timeout', () {
-      const e = LogEntry(
+      const e = ForwardEvent(
         time: 't',
         from: 'f',
         to: 'to',

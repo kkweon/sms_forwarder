@@ -1,11 +1,13 @@
-class LogEntry {
+/// One per-recipient outcome of a forward attempt, displayed in the
+/// in-app history. Distinct from diagnostic strings written via [appLog].
+class ForwardEvent {
   final String time;
   final String from;
   final String to;
   final String body;
   final String status; // 'sent', 'failed', or 'timeout'
 
-  const LogEntry({
+  const ForwardEvent({
     required this.time,
     required this.from,
     required this.to,
@@ -23,7 +25,7 @@ class LogEntry {
     'status': status,
   };
 
-  factory LogEntry.fromJson(Map<String, dynamic> json) => LogEntry(
+  factory ForwardEvent.fromJson(Map<String, dynamic> json) => ForwardEvent(
     time: json['time'] as String,
     from: json['from'] as String,
     to: json['to'] as String,

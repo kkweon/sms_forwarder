@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sms_forwarder/log_entry.dart';
+import 'package:sms_forwarder/forward_event.dart';
 import 'package:sms_forwarder/sms_forwarder_page.dart';
 
 /// Pumps [SmsForwarderPage] with permissions pre-granted.
@@ -114,7 +114,7 @@ void main() {
     testWidgets('displays log entries written by the background engine', (
       tester,
     ) async {
-      final entry = LogEntry(
+      final entry = ForwardEvent(
         time: '2026-01-01T12:00:00.000',
         from: 'BofA',
         to: '+12025550123',
@@ -139,7 +139,7 @@ void main() {
       expect(find.text('No messages forwarded yet'), findsOneWidget);
 
       // Simulate background engine writing a new log entry.
-      final entry = LogEntry(
+      final entry = ForwardEvent(
         time: '2026-01-01T12:00:00.000',
         from: 'Chase',
         to: '+12025550123',
@@ -156,7 +156,7 @@ void main() {
     });
 
     testWidgets('clear button removes all log entries', (tester) async {
-      final entry = LogEntry(
+      final entry = ForwardEvent(
         time: '2026-01-01T12:00:00.000',
         from: 'Google',
         to: '+12025550123',

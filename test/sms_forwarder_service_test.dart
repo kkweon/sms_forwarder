@@ -7,23 +7,26 @@ import 'fake_sms_service.dart';
 
 void main() {
   group('forwardSms', () {
-    test('sends to a single destination and returns one LogEntry', () async {
-      final fake = FakeSmsService();
-      final entries = await forwardSms(
-        smsService: fake,
-        message: makeSmsMessage(address: 'BofA', body: 'Code 1234.'),
-        destinationNumbers: ['+12025550123'],
-      );
+    test(
+      'sends to a single destination and returns one ForwardEvent',
+      () async {
+        final fake = FakeSmsService();
+        final entries = await forwardSms(
+          smsService: fake,
+          message: makeSmsMessage(address: 'BofA', body: 'Code 1234.'),
+          destinationNumbers: ['+12025550123'],
+        );
 
-      expect(fake.sent.length, 1);
-      expect(fake.sent[0].to, '+12025550123');
-      expect(entries.length, 1);
-      expect(entries[0].to, '+12025550123');
-      expect(entries[0].status, 'sent');
-    });
+        expect(fake.sent.length, 1);
+        expect(fake.sent[0].to, '+12025550123');
+        expect(entries.length, 1);
+        expect(entries[0].to, '+12025550123');
+        expect(entries[0].status, 'sent');
+      },
+    );
 
     test(
-      'sends to multiple destinations and returns one LogEntry per recipient',
+      'sends to multiple destinations and returns one ForwardEvent per recipient',
       () async {
         final fake = FakeSmsService();
         final entries = await forwardSms(

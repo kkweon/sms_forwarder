@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sms_forwarder/log_entry.dart';
+import 'package:sms_forwarder/forward_event.dart';
 import 'package:sms_forwarder/settings_service.dart';
 
 void main() {
@@ -50,33 +50,32 @@ void main() {
     });
   });
 
-  group('SettingsService forwardingLogs', () {
+  group('SettingsService forwardEvents', () {
     test('returns empty list by default', () async {
       final settings = await SettingsService.load();
-      expect(settings.forwardingLogs, isEmpty);
+      expect(settings.forwardEvents, isEmpty);
     });
 
-    test('returns deserialized entries after saveLogs()', () async {
+    test('returns deserialized events after recordForwardEvents()', () async {
       final settings = await SettingsService.load();
-      final logs = [
-        const LogEntry(
+      await settings.recordForwardEvents([
+        const ForwardEvent(
           time: '2024-01-01T00:00:00.000',
           from: 'BofA',
           to: '+12025550123',
           body: 'Code 1234.',
           status: 'sent',
         ),
-        const LogEntry(
+        const ForwardEvent(
           time: '2024-01-01T00:01:00.000',
           from: 'Chase',
           to: '+12025550123',
           body: 'Verify: 5678',
           status: 'failed',
         ),
-      ];
-      await settings.saveLogs(logs);
+      ]);
 
-      final loaded = settings.forwardingLogs;
+      final loaded = settings.forwardEvents;
       expect(loaded.length, 2);
       expect(loaded[0].from, 'BofA');
       expect(loaded[0].status, 'sent');
@@ -84,37 +83,55 @@ void main() {
       expect(loaded[1].status, 'failed');
     });
 
-    test('preserves order', () async {
+    test('prepends new events newest-first across multiple calls', () async {
       final settings = await SettingsService.load();
-      final logs = [
-        const LogEntry(
+      await settings.recordForwardEvents([
+        const ForwardEvent(
           time: 'first',
           from: 'A',
           to: 'to',
           body: 'b',
           status: 'sent',
         ),
-        const LogEntry(
+      ]);
+      await settings.recordForwardEvents([
+        const ForwardEvent(
           time: 'second',
           from: 'B',
           to: 'to',
           body: 'b',
           status: 'sent',
         ),
-      ];
-      await settings.saveLogs(logs);
+      ]);
 
-      final loaded = settings.forwardingLogs;
-      expect(loaded[0].time, 'first');
-      expect(loaded[1].time, 'second');
+      final loaded = settings.forwardEvents;
+      expect(loaded[0].time, 'second');
+      expect(loaded[1].time, 'first');
+    });
+
+    test('caps history at 50 events', () async {
+      final settings = await SettingsService.load();
+      for (var i = 0; i < 60; i++) {
+        await settings.recordForwardEvents([
+          ForwardEvent(
+            time: '$i',
+            from: 'A',
+            to: 'to',
+            body: 'b',
+            status: 'sent',
+          ),
+        ]);
+      }
+      expect(settings.forwardEvents.length, 50);
+      expect(settings.forwardEvents.first.time, '59');
     });
   });
 
-  group('SettingsService clearLogs', () {
-    test('empties forwardingLogs', () async {
+  group('SettingsService clearForwardEvents', () {
+    test('empties forwardEvents', () async {
       final settings = await SettingsService.load();
-      await settings.saveLogs([
-        const LogEntry(
+      await settings.recordForwardEvents([
+        const ForwardEvent(
           time: 't',
           from: 'f',
           to: 'to',
@@ -122,8 +139,8 @@ void main() {
           status: 'sent',
         ),
       ]);
-      await settings.clearLogs();
-      expect(settings.forwardingLogs, isEmpty);
+      await settings.clearForwardEvents();
+      expect(settings.forwardEvents, isEmpty);
     });
   });
 }
