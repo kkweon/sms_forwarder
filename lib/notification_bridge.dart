@@ -39,10 +39,10 @@ class NotificationBridge {
 
   Future<void> openSettings() => _control.invokeMethod<void>('openSettings');
 
-  /// Debug builds only: posts a real MessagingStyle notification from our
-  /// own package so the end-to-end pipeline can be exercised on-device
-  /// without sending an SMS. The listener bypasses the package whitelist
-  /// just for this single post.
+  /// Posts a real MessagingStyle notification from our own package so the
+  /// end-to-end pipeline can be exercised on-device without sending an
+  /// SMS. The listener bypasses the package whitelist just for this single
+  /// post.
   Future<void> postTestNotification() =>
       _control.invokeMethod<void>('postTestNotification');
 }

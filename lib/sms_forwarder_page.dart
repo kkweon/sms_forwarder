@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -252,12 +251,11 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
         title: const Text('SMS Forwarder'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
-          if (kDebugMode)
-            IconButton(
-              icon: const Icon(Icons.science_outlined),
-              tooltip: 'Post test notification',
-              onPressed: _postTestNotification,
-            ),
+          IconButton(
+            icon: const Icon(Icons.science_outlined),
+            tooltip: 'Post test notification',
+            onPressed: _postTestNotification,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh logs',

@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart'
+    show kDebugMode, kProfileMode, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'file_logger.dart';
 
@@ -14,12 +17,14 @@ class DebugLogPage extends StatefulWidget {
 
 class _DebugLogPageState extends State<DebugLogPage> {
   String _logContent = '';
+  String _buildInfo = 'Loading build info…';
   final _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadBuildInfo();
   }
 
   @override
@@ -37,6 +42,31 @@ class _DebugLogPageState extends State<DebugLogPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  Future<void> _loadBuildInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final mode = kReleaseMode
+          ? 'release'
+          : kProfileMode
+          ? 'profile'
+          : kDebugMode
+          ? 'debug'
+          : 'unknown';
+      final lines = [
+        'App:      ${info.appName} (${info.packageName})',
+        'Version:  ${info.version}+${info.buildNumber}',
+        'Build:    $mode',
+        if (info.buildSignature.isNotEmpty) 'Signature: ${info.buildSignature}',
+        if (info.installerStore != null) 'Installer: ${info.installerStore}',
+      ];
+      if (!mounted) return;
+      setState(() => _buildInfo = lines.join('\n'));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _buildInfo = 'Could not read build info: $e');
+    }
+  }
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
@@ -50,10 +80,10 @@ class _DebugLogPageState extends State<DebugLogPage> {
   }
 
   void _copyAll() {
-    Clipboard.setData(ClipboardData(text: _logContent));
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Log copied to clipboard')));
+    Clipboard.setData(ClipboardData(text: '$_buildInfo\n\n$_logContent'));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Build info + log copied to clipboard')),
+    );
   }
 
   @override
@@ -80,13 +110,29 @@ class _DebugLogPageState extends State<DebugLogPage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        controller: _scrollController,
-        padding: const EdgeInsets.all(12),
-        child: SelectableText(
-          _logContent,
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
-        ),
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: SelectableText(
+              _buildInfo,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                _logContent,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

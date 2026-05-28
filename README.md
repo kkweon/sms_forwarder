@@ -71,7 +71,7 @@ This installs git hooks that run `dart format`, `dart analyze`, and `flutter tes
 
 ## Smoke-testing on a real device
 
-Because intake is now notification-based, the easiest end-to-end test is the in-app **"Post test notification"** button (the test-tube icon in the AppBar, debug builds only). It posts a real `MessagingStyle` notification carrying `"Your verification code is 451287"` from our own package; the listener bypasses its Google-Messages whitelist for this single post and the rest of the pipeline runs unchanged.
+Because intake is now notification-based, the easiest end-to-end test is the in-app **"Post test notification"** button (the test-tube icon in the AppBar). It posts a real `MessagingStyle` notification carrying `"Your verification code is 451287"` from our own package; the listener bypasses its Google-Messages whitelist for this single post and the rest of the pipeline runs unchanged.
 
 ```bash
 flutter build apk --debug

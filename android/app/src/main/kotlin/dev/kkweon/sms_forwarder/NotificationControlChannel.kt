@@ -4,7 +4,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -16,8 +15,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * MethodChannel for managing notification-listener access and (in debug
- * builds) posting a synthetic test notification.
+ * MethodChannel for managing notification-listener access and posting a
+ * synthetic test notification (available in all builds — useful for
+ * verifying the pipeline without sending a real SMS).
  */
 object NotificationControlChannel {
     private const val TAG = "SmsForwarder"
@@ -35,24 +35,13 @@ object NotificationControlChannel {
                         result.success(null)
                     }
                     "postTestNotification" -> {
-                        if (isDebuggable(context)) {
-                            postTestNotification(context)
-                            result.success(null)
-                        } else {
-                            result.error(
-                                "DEBUG_ONLY",
-                                "postTestNotification is only available in debug builds",
-                                null,
-                            )
-                        }
+                        postTestNotification(context)
+                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }
             }
     }
-
-    private fun isDebuggable(context: Context): Boolean =
-        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private fun isAccessGranted(context: Context): Boolean {
         val enabled = NotificationManagerCompat.getEnabledListenerPackages(context)
