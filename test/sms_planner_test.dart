@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sms_forwarder/app_state.dart';
-import 'package:sms_forwarder/command.dart';
-import 'package:sms_forwarder/incoming_message.dart';
-import 'package:sms_forwarder/sms_planner.dart';
+import 'package:sms_forwarder/forwarding/command.dart';
+import 'package:sms_forwarder/forwarding/sms_planner.dart';
+import 'package:sms_forwarder/notifications/incoming_message.dart';
+import 'package:sms_forwarder/settings/app_state.dart';
 
 AppState _state({
   bool forwardingEnabled = true,

@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sms_forwarder/forward_event.dart';
-import 'package:sms_forwarder/sms_forwarder_page.dart';
+import 'package:sms_forwarder/settings/forward_event.dart';
+import 'package:sms_forwarder/ui/sms_forwarder_page.dart';
 
 /// Pumps [SmsForwarderPage] with notification access pre-granted.
 /// [SharedPreferences] must be mocked before calling this.

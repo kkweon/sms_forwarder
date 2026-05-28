@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import 'file_logger.dart';
+import '../logging/file_logger.dart';
 
 class DebugLogPage extends StatefulWidget {
   const DebugLogPage({super.key, required this.logger});

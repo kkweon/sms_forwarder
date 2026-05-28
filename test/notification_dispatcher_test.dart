@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sms_forwarder/incoming_message.dart';
-import 'package:sms_forwarder/notification_dispatcher.dart';
+import 'package:sms_forwarder/notifications/incoming_message.dart';
+import 'package:sms_forwarder/notifications/notification_dispatcher.dart';
 
 import 'fake_sms_service.dart';
 
@@ -16,7 +16,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     ctrl = StreamController<IncomingMessage>.broadcast();
     fakeSms = FakeSmsService();
-    dispatcher = NotificationDispatcher.forTesting(
+    dispatcher = NotificationDispatcher(
       streamFactory: () => ctrl.stream,
       smsServiceFactory: () => fakeSms,
     );

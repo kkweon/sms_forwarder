@@ -1,7 +1,7 @@
 import 'package:another_telephony/telephony.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sms_forwarder/incoming_message.dart';
-import 'package:sms_forwarder/sms_forwarder_service.dart';
+import 'package:sms_forwarder/forwarding/sms_sender.dart';
+import 'package:sms_forwarder/notifications/incoming_message.dart';
 
 import 'fake_sms_service.dart';
 

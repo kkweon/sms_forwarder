@@ -1,5 +1,5 @@
 import 'package:another_telephony/telephony.dart';
-import 'package:sms_forwarder/sms_service.dart';
+import 'package:sms_forwarder/forwarding/sms_service.dart';
 
 class RecordedSend {
   final String to;

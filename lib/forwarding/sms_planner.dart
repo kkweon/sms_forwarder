@@ -1,6 +1,6 @@
-import 'app_state.dart';
+import '../notifications/incoming_message.dart';
+import '../settings/app_state.dart';
 import 'command.dart';
-import 'incoming_message.dart';
 import 'sms_utils.dart';
 
 const loopWindowMs = 60 * 1000;

@@ -1,9 +1,9 @@
-import 'app_log.dart';
+import '../logging/app_log.dart';
+import '../settings/loop_detector.dart';
+import '../settings/settings_service.dart';
 import 'command.dart';
-import 'loop_detector.dart';
-import 'sms_forwarder_service.dart';
+import 'sms_sender.dart';
 import 'sms_service.dart';
-import 'settings_service.dart';
 
 /// Side-effecting layer: executes one [Command] decided by [planForSms].
 class CommandHandler {

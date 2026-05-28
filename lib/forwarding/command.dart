@@ -1,4 +1,4 @@
-import 'incoming_message.dart';
+import '../notifications/incoming_message.dart';
 
 /// What the planner decides to do for a single incoming message.
 /// Every command carries the [log] string the handler should write

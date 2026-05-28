@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:another_telephony/telephony.dart' show SendStatus;
 
-import 'app_log.dart';
-import 'forward_event.dart';
-import 'incoming_message.dart';
+import '../logging/app_log.dart';
+import '../notifications/incoming_message.dart';
+import '../settings/forward_event.dart';
 import 'sms_service.dart';
 import 'sms_utils.dart';
 

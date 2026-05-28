@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 
-import 'app_log.dart';
-import 'file_logger.dart';
-import 'notification_dispatcher.dart';
-import 'sms_forwarder_page.dart';
+import 'forwarding/real_sms_service.dart';
+import 'logging/app_log.dart';
+import 'logging/file_logger.dart';
+import 'notifications/notification_bridge.dart';
+import 'notifications/notification_dispatcher.dart';
+import 'ui/sms_forwarder_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final logger = await FileLogger.init();
   initAppLog(logger);
   appLog('[SMS] app started');
-  await NotificationDispatcher.instance.start();
+  final dispatcher = NotificationDispatcher(
+    streamFactory: () => NotificationBridge.instance.stream,
+    smsServiceFactory: () => RealSmsService(),
+  );
+  await dispatcher.start();
   runApp(MyApp(logger: logger));
 }
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sms_forwarder/sms_utils.dart';
+import 'package:sms_forwarder/forwarding/sms_utils.dart';
 
 void main() {
   group('preprocessBody', () {

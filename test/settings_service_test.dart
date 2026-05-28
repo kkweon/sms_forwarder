@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sms_forwarder/forward_event.dart';
-import 'package:sms_forwarder/settings_service.dart';
+import 'package:sms_forwarder/settings/forward_event.dart';
+import 'package:sms_forwarder/settings/settings_service.dart';
 
 void main() {
   setUp(() {

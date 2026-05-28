@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'app_log.dart';
+import '../forwarding/sms_utils.dart';
+import '../forwarding/telephony_bridge.dart';
+import '../logging/app_log.dart';
+import '../notifications/notification_bridge.dart';
+import '../settings/forward_event.dart';
+import '../settings/loop_detector.dart';
+import '../settings/settings_service.dart';
 import 'debug_log_page.dart';
-import 'file_logger.dart';
-import 'forward_event.dart';
-import 'loop_detector.dart';
-import 'notification_bridge.dart';
-import 'settings_service.dart';
-import 'sms_utils.dart';
+import '../logging/file_logger.dart';
 
 const _prefsMigrationSeen = 'migration_notification_listener_v1_seen';
 
@@ -34,10 +34,6 @@ class SmsForwarderPage extends StatefulWidget {
 
 class _SmsForwarderPageState extends State<SmsForwarderPage>
     with WidgetsBindingObserver {
-  static const _methodChannel = MethodChannel(
-    'dev.kkweon.sms_forwarder/telephony',
-  );
-
   SettingsService? _settings;
   LoopDetector? _loopDetector;
   bool _notificationAccessGranted = false;
@@ -159,9 +155,7 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
       if (!phone.isGranted) {
         await Permission.phone.request();
       }
-      final numbers =
-          await _methodChannel.invokeListMethod<String>('getOwnPhoneNumbers') ??
-          [];
+      final numbers = await TelephonyBridge.instance.getOwnPhoneNumbers();
       if (!mounted) return;
       setState(() {
         _ownNumbers = numbers

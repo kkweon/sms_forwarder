@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sms_forwarder/forward_event.dart';
+import 'package:sms_forwarder/settings/forward_event.dart';
 
 void main() {
   const entry = ForwardEvent(
