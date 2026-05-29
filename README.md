@@ -30,10 +30,12 @@ Every attempt (sent/failed/timeout) is recorded in the in-app Forwarding Log reg
 
 ### 1. Build & install APK
 
-Build split APKs (smaller per-ABI binaries):
+Common commands run through [Task](https://taskfile.dev) — `task` lists them all.
+
+Build split APKs (smaller per-ABI binaries), version-stamped with the current datetime:
 
 ```bash
-flutter build apk --split-per-abi --release
+task build
 ```
 
 Outputs:
@@ -41,20 +43,14 @@ Outputs:
 - `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`   (~17.2MB)
 - `build/app/outputs/flutter-apk/app-x86_64-release.apk`      (~18.6MB)
 
-Install the APK matching your device's ABI (check `flutter devices` for the architecture):
+The build's `versionName` is the datetime (e.g. `2026.05.28.2137`) and `versionCode` is
+the Unix epoch seconds — always increasing and within Android's `versionCode` limit.
+
+Install the APK matching your device's ABI (`arm64-v8a` by default; check `flutter devices`):
 
 ```bash
-flutter install \
-  --device-id <YOUR-DEVICE-ID> \
-  --use-application-binary=build/app/outputs/flutter-apk/app-<ABI>-release.apk
-```
-
-Example for Pixel 7 Pro (arm64):
-
-```bash
-flutter install \
-  --device-id 2B141FDH300F4B \
-  --use-application-binary=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+task install DEVICE=<YOUR-DEVICE-ID>                 # arm64-v8a
+task install DEVICE=<YOUR-DEVICE-ID> ABI=armeabi-v7a # or x86_64
 ```
 
 ### 2. First launch
@@ -97,21 +93,27 @@ this grant is missing.
 
 ## Development
 
-Install [Lefthook](https://github.com/evilmartians/lefthook), then:
+Install [Lefthook](https://github.com/evilmartians/lefthook), then run one-time setup:
 
 ```bash
-flutter pub get
-lefthook install
+task setup   # flutter pub get + lefthook install
 ```
 
 This installs git hooks that run `dart format`, `dart analyze`, and `flutter test` on every commit.
+
+Day-to-day:
+
+```bash
+task fix     # auto-fix lints + format (run before committing so the hook passes)
+task test    # flutter test
+```
 
 ## Smoke-testing on a real device
 
 Because intake is now notification-based, the easiest end-to-end test is the in-app **"Post test notification"** button (the test-tube icon in the AppBar). It posts a real `MessagingStyle` notification carrying `"Your verification code is 451287"` from our own package; the listener bypasses its Google-Messages whitelist for this single post and the rest of the pipeline runs unchanged.
 
 ```bash
-flutter build apk --debug
+task build MODE=debug
 flutter install -d <device-id>
 # Grant notification access:
 adb shell am start -a android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
