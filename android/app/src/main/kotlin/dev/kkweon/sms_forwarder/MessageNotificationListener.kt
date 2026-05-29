@@ -63,10 +63,21 @@ class MessageNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val pkg = sbn.packageName
         val allowed = pkg == ALLOWED_PKG || (allowSelfPackage && pkg == OUR_PKG)
-        if (!allowed) return
+        if (!allowed) {
+            diag("package_not_allowed", pkg, sbn.key)
+            return
+        }
 
-        val (sender, body) = extract(sbn.notification) ?: return
-        if (body.isBlank()) return
+        val extracted = extract(sbn.notification)
+        if (extracted == null) {
+            diag("no_extractable_body", pkg, sbn.key)
+            return
+        }
+        val (sender, body) = extracted
+        if (body.isBlank()) {
+            diag("blank_body", pkg, sbn.key)
+            return
+        }
 
         val now = System.currentTimeMillis()
         // Prune stale entries opportunistically (cheap; ConcurrentHashMap-safe).
@@ -96,6 +107,22 @@ class MessageNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         // no-op
+    }
+
+    /**
+     * Surface a drop reason both to logcat and to the Dart Debug Log by
+     * pushing a small map through the same EventChannel sink that carries
+     * real events. The Dart dispatcher logs and skips entries that carry
+     * a `diag` field instead of processing them.
+     */
+    private fun diag(reason: String, pkg: String?, sbnKey: String?) {
+        Log.d(TAG, "dropped: $reason pkg=$pkg key=$sbnKey")
+        val payload = mapOf<String, Any?>(
+            "diag" to reason,
+            "packageName" to pkg,
+            "key" to sbnKey,
+        )
+        mainHandler.post { dispatch(payload) }
     }
 
     private fun dispatch(payload: Map<String, Any?>) {
@@ -133,6 +160,7 @@ class MessageNotificationListener : NotificationListenerService() {
             // Activity has attached.
             MainActivity.registerChannels(engine, applicationContext)
             NotificationControlChannel.register(engine, applicationContext)
+            SmsSenderChannel.register(engine, applicationContext)
             attachEventChannel(engine)
         } else {
             // Engine already exists; just (re-)attach the EventChannel sink

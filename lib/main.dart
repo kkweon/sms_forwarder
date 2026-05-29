@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'forwarding/real_sms_service.dart';
+import 'forwarding/platform_sms_service.dart';
 import 'logging/app_log.dart';
 import 'logging/file_logger.dart';
 import 'notifications/notification_bridge.dart';
@@ -14,7 +14,7 @@ void main() async {
   appLog('[SMS] app started');
   final dispatcher = NotificationDispatcher(
     streamFactory: () => NotificationBridge.instance.stream,
-    smsServiceFactory: () => RealSmsService(),
+    smsServiceFactory: () => PlatformSmsService(),
   );
   await dispatcher.start();
   runApp(MyApp(logger: logger));

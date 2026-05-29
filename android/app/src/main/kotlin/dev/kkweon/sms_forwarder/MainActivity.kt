@@ -71,5 +71,6 @@ class MainActivity : FlutterActivity() {
         // shared channels wired up too.
         registerChannels(flutterEngine, applicationContext)
         NotificationControlChannel.register(flutterEngine, applicationContext)
+        SmsSenderChannel.register(flutterEngine, applicationContext)
     }
 }

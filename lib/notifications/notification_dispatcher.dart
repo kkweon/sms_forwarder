@@ -45,6 +45,13 @@ class NotificationDispatcher {
   }
 
   Future<void> _handle(IncomingMessage msg) async {
+    if (msg.diag != null) {
+      appLog(
+        '[NL] dropped: ${msg.diag} pkg=${msg.packageName} '
+        'key=${msg.notificationKey}',
+      );
+      return;
+    }
     appLog(
       '[NL] event from=${msg.address} pkg=${msg.packageName} body=${msg.body}',
     );

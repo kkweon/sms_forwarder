@@ -8,12 +8,19 @@ class IncomingMessage {
   final String? notificationKey;
   final int? postTimeMs;
 
+  /// Non-null when this event is a *diagnostic*: a notification the
+  /// Kotlin listener silently dropped (package mismatch, blank body, …)
+  /// surfaced to Dart for the Debug Log instead of being processed.
+  /// The dispatcher logs and skips when this is set.
+  final String? diag;
+
   const IncomingMessage({
     this.address,
     this.body,
     this.packageName,
     this.notificationKey,
     this.postTimeMs,
+    this.diag,
   });
 
   factory IncomingMessage.fromMap(Map<dynamic, dynamic> map) => IncomingMessage(
@@ -22,5 +29,6 @@ class IncomingMessage {
     packageName: map['packageName'] as String?,
     notificationKey: map['key'] as String?,
     postTimeMs: (map['postTime'] as num?)?.toInt(),
+    diag: map['diag'] as String?,
   );
 }

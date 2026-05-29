@@ -57,6 +57,7 @@ object NotificationControlChannel {
     }
 
     private fun postTestNotification(context: Context) {
+        Log.d(TAG, "postTestNotification: posting synthetic MessagingStyle notification")
         ensureTestChannel(context)
         @Suppress("DEPRECATION")
         val style = NotificationCompat.MessagingStyle("Self")

@@ -88,6 +88,22 @@ void main() {
     expect(fakeSms.sent, isEmpty);
   });
 
+  test('diagnostic event is logged and never reaches the SmsService', () async {
+    SharedPreferences.setMockInitialValues({
+      'forwarding_enabled': true,
+      'destination_numbers': ['+12025550123'],
+    });
+
+    await pumpEvent(
+      const IncomingMessage(
+        packageName: 'com.example.other',
+        diag: 'package_not_allowed',
+      ),
+    );
+
+    expect(fakeSms.sent, isEmpty);
+  });
+
   test('loop detection disables forwarding', () async {
     final now = DateTime.now().millisecondsSinceEpoch;
     SharedPreferences.setMockInitialValues({
