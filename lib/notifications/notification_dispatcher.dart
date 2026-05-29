@@ -5,6 +5,7 @@ import '../forwarding/sms_planner.dart';
 import '../forwarding/sms_service.dart';
 import '../logging/app_log.dart';
 import '../settings/app_state.dart';
+import '../settings/forward_dedup_cache.dart';
 import '../settings/loop_detector.dart';
 import '../settings/settings_service.dart';
 import 'incoming_message.dart';
@@ -59,15 +60,18 @@ class NotificationDispatcher {
       final settings = await SettingsService.load();
       await settings.reload();
       final loopDetector = await LoopDetector.load();
+      final dedupCache = await ForwardDedupCache.load();
       final state = AppState(
         forwardingEnabled: settings.forwardingEnabled,
         destinationNumbers: settings.destinationNumbers,
         recentForwardTimestampsMs: loopDetector.recentTimestamps,
+        recentForwardDedupKeys: dedupCache.recentKeys,
       );
       final handler = CommandHandler(
         smsService: _smsServiceFactory(),
         settings: settings,
         loopDetector: loopDetector,
+        dedupCache: dedupCache,
       );
       await handler.handle(planForSms(msg, state));
     } catch (e, stack) {

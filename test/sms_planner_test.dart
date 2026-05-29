@@ -3,15 +3,18 @@ import 'package:sms_forwarder/forwarding/command.dart';
 import 'package:sms_forwarder/forwarding/sms_planner.dart';
 import 'package:sms_forwarder/notifications/incoming_message.dart';
 import 'package:sms_forwarder/settings/app_state.dart';
+import 'package:sms_forwarder/settings/forward_dedup_cache.dart';
 
 AppState _state({
   bool forwardingEnabled = true,
   List<String> destinationNumbers = const ['+12025550123'],
   List<int> recentForwardTimestampsMs = const [],
+  Set<String> recentForwardDedupKeys = const {},
 }) => AppState(
   forwardingEnabled: forwardingEnabled,
   destinationNumbers: destinationNumbers,
   recentForwardTimestampsMs: recentForwardTimestampsMs,
+  recentForwardDedupKeys: recentForwardDedupKeys,
 );
 
 IncomingMessage _msg({String? address, String? body}) =>
@@ -97,6 +100,52 @@ void main() {
       expect(fwd.destinations, ['+12025550123', '+19998887777']);
       expect(fwd.attemptTimestampMs, nowMs);
       expect(fwd.message, validSms);
+    });
+  });
+
+  group('planForSms — per-destination dedup filter', () {
+    test('drops a destination already forwarded for this body', () {
+      final cmd = planForSms(
+        validSms,
+        _state(
+          destinationNumbers: ['+12025550123', '+19998887777'],
+          recentForwardDedupKeys: {
+            ForwardDedupCache.keyFor(validSms.body!, '+12025550123'),
+          },
+        ),
+        now: now,
+      );
+      expect(cmd, isA<ForwardCommand>());
+      expect((cmd as ForwardCommand).destinations, ['+19998887777']);
+    });
+
+    test('NoActionCommand when all destinations already forwarded', () {
+      final cmd = planForSms(
+        validSms,
+        _state(
+          destinationNumbers: ['+12025550123', '+19998887777'],
+          recentForwardDedupKeys: {
+            ForwardDedupCache.keyFor(validSms.body!, '+12025550123'),
+            ForwardDedupCache.keyFor(validSms.body!, '+19998887777'),
+          },
+        ),
+        now: now,
+      );
+      expect(cmd, isA<NoActionCommand>());
+      expect(cmd.log, contains('already forwarded'));
+    });
+
+    test('a different code to the same destination is not deduped', () {
+      final cmd = planForSms(
+        _msg(address: 'BofA', body: 'Your code is 654321'),
+        _state(
+          recentForwardDedupKeys: {
+            ForwardDedupCache.keyFor('Your code is 123456', '+12025550123'),
+          },
+        ),
+        now: now,
+      );
+      expect(cmd, isA<ForwardCommand>());
     });
   });
 }

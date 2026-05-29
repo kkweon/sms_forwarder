@@ -4,13 +4,27 @@ A personal Android app that automatically forwards verification-code messages (b
 
 ## How it works
 
-The app watches notifications posted by Google Messages (`com.google.android.apps.messaging`) via a `NotificationListenerService`. Each incoming notification is parsed for a sender and body, filtered against a keyword + digit pattern, and forwarded to the configured destination numbers as an outgoing SMS. Because notifications cover both SMS and RCS, the app catches verification codes regardless of which protocol the sender uses.
+The app ingests messages from **two** sources that feed the same Flutter pipeline:
+
+1. **`SmsReceiver`** — a `RECEIVE_SMS` BroadcastReceiver that reads incoming SMS straight from the telephony layer (the raw PDU). Because it never goes through the notification system, it is **not** subject to Android 15+'s OTP notification redaction. This is the reliable path for SMS verification codes.
+2. **`MessageNotificationListener`** — a `NotificationListenerService` watching Google Messages (`com.google.android.apps.messaging`). This covers **RCS** messages, which never fire `SMS_RECEIVED`.
+
+Both sources push a parsed (sender, body) into one cached `FlutterEngine` via an `EventChannel`. Each event is filtered against a keyword + digit pattern and forwarded to the configured destination numbers as an outgoing SMS.
+
+Because an incoming SMS fires *both* sources a few seconds apart, a **dedup layer** guarantees the same message body is forwarded to the same destination at most once within a 5-minute TTL:
+
+- `ForwardDedupCache` (SharedPreferences, keyed by `bodyHash|destination`) survives process restarts and is recorded **on successful send only** — a failed/timeout send is left open so the other source can retry.
+- `ForwardReservation` (in-memory, synchronous) closes the race between two near-simultaneous events on the same isolate.
+
+Every attempt (sent/failed/timeout) is recorded in the in-app Forwarding Log regardless of dedup.
 
 ## Requirements
 
 - Google Messages must be the device's messaging app (notifications are app-specific).
 - Notification access must be granted to this app — the first launch shows a one-time dialog with a CTA to open Settings.
 - `SEND_SMS` permission to deliver the forwarded message.
+- `RECEIVE_SMS` + `SEND_SMS` (the SMS permission group) must be granted at runtime — the app requests them on launch alongside the phone permission.
+- The `RECEIVE_SENSITIVE_NOTIFICATIONS` appop (see step 3) is now **optional**. The `SmsReceiver` reads SMS un-redacted, so it is no longer needed for SMS verification codes. It only matters for the notification/**RCS** path, where Android 15+ otherwise redacts OTP bodies to `"Sensitive notification content hidden"`. It cannot be declared in the manifest (protection level `signature|preinstalled|role|knownSigner`) and resets on every reinstall/update.
 
 ## Setup
 
@@ -48,6 +62,29 @@ flutter install \
 - Grant SMS permissions when prompted
 - Add one or more destination phone numbers
 - Toggle forwarding on
+
+### 3. (Optional) Grant sensitive-notification access for the RCS path
+
+SMS verification codes are handled by the `SmsReceiver` and need no special
+setup. This step only improves the **RCS / notification** path: Android 15+
+redacts OTP notification bodies for ordinary notification listeners, so an OTP
+sent over RCS would be unreadable without it. Re-run after each `flutter install`:
+
+```bash
+scripts/setup-device.sh <YOUR-DEVICE-ID>   # device-id optional if only one is attached
+```
+
+This grants the `RECEIVE_SENSITIVE_NOTIFICATIONS` appop. The grant survives
+reboots but **not** reinstalls/updates, so run it as the last step of every
+deploy. To verify manually:
+
+```bash
+adb shell cmd appops get dev.kkweon.sms_forwarder RECEIVE_SENSITIVE_NOTIFICATIONS
+# expect: RECEIVE_SENSITIVE_NOTIFICATIONS: allow
+```
+
+If a real OTP shows up in the logs as `body=Sensitive notification content hidden`,
+this grant is missing.
 
 ## Dependencies
 

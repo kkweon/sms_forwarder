@@ -5,9 +5,14 @@ class AppState {
   final List<String> destinationNumbers;
   final List<int> recentForwardTimestampsMs;
 
+  /// Keys (`bodyHash|destination`, see [ForwardDedupCache.keyFor]) forwarded
+  /// within the dedup TTL. The planner drops destinations already in this set.
+  final Set<String> recentForwardDedupKeys;
+
   const AppState({
     required this.forwardingEnabled,
     required this.destinationNumbers,
     required this.recentForwardTimestampsMs,
+    this.recentForwardDedupKeys = const {},
   });
 }

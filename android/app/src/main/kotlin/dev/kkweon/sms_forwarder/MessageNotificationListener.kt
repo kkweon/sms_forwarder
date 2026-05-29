@@ -2,6 +2,7 @@ package dev.kkweon.sms_forwarder
 
 import android.app.Notification
 import android.app.Person
+import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -24,6 +25,10 @@ import java.util.concurrent.ConcurrentHashMap
  * Owns the cached FlutterEngine so the same Dart isolate serves the UI
  * and incoming notification events — eliminates the separate background
  * entry point used by the old SmsReceiver pipeline.
+ *
+ * The engine + dispatch plumbing lives in the [companion object] (static) so
+ * [SmsReceiver] can feed raw SMS into the *same* pipeline via [ingestExternal]
+ * without depending on the service instance being alive.
  */
 class MessageNotificationListener : NotificationListenerService() {
 
@@ -43,21 +48,138 @@ class MessageNotificationListener : NotificationListenerService() {
 
         private val seen = ConcurrentHashMap<String, Long>()
         private val pending = ArrayDeque<Map<String, Any?>>()
-    }
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+        private val mainHandler = Handler(Looper.getMainLooper())
+
+        /**
+         * Feed a message from a non-notification source (e.g. [SmsReceiver]'s
+         * raw SMS) into the same pipeline the notification listener uses.
+         *
+         * MUST be called on the main thread (the engine + dispatch plumbing is
+         * main-thread-only). Runs synchronously: ensures the cached engine
+         * exists, applies dedup, and dispatches/buffers the payload — so a
+         * caller using `goAsync()` can safely `finish()` immediately after.
+         *
+         * Kotlin intake dedup here is per-source (the key includes
+         * [packageName]); cross-source dedup between SMS and the Messages
+         * notification is handled on the Dart side, keyed by body + destination.
+         */
+        fun ingestExternal(context: Context, sender: String, body: String, packageName: String) {
+            ensureEngine(context)
+            if (body.isBlank()) {
+                Log.d(TAG, "ingestExternal: blank body from $packageName, ignoring")
+                return
+            }
+            val dedupKey = "$packageName:${body.hashCode()}"
+            if (!passesDedup(dedupKey)) return
+            val payload = mapOf<String, Any?>(
+                "packageName" to packageName,
+                "sender" to sender,
+                "body" to body,
+                "postTime" to System.currentTimeMillis(),
+                "key" to dedupKey,
+            )
+            dispatch(payload)
+        }
+
+        /**
+         * Opportunistically prune stale entries, then check-and-record
+         * [dedupKey]. Returns false (skip) on a fresh hit within the TTL.
+         */
+        private fun passesDedup(dedupKey: String): Boolean {
+            val now = System.currentTimeMillis()
+            val it = seen.entries.iterator()
+            while (it.hasNext()) {
+                if (now - it.next().value > DEDUP_TTL_MS) it.remove()
+            }
+            val last = seen[dedupKey]
+            if (last != null && now - last < DEDUP_TTL_MS) {
+                Log.d(TAG, "dedup hit for $dedupKey, skipping")
+                return false
+            }
+            seen[dedupKey] = now
+            return true
+        }
+
+        fun ensureEngine(context: Context) {
+            val appContext = context.applicationContext
+            val cache = FlutterEngineCache.getInstance()
+            val engine = cache.get(ENGINE_ID)
+            if (engine == null) {
+                Log.d(TAG, "creating cached FlutterEngine")
+                val newEngine = FlutterEngine(appContext)
+                // Register all Flutter plugins before executing the entrypoint
+                // so that platform channels (e.g. shared_preferences,
+                // permission_handler) are wired up when Dart starts.
+                GeneratedPluginRegistrant.registerWith(newEngine)
+                newEngine.dartExecutor.executeDartEntrypoint(
+                    DartExecutor.DartEntrypoint.createDefault()
+                )
+                cache.put(ENGINE_ID, newEngine)
+                // Wire shared channels exactly once on engine creation, so they
+                // exist even when no Activity has attached.
+                MainActivity.registerChannels(newEngine, appContext)
+                NotificationControlChannel.register(newEngine, appContext)
+                SmsSenderChannel.register(newEngine, appContext)
+                attachEventChannel(newEngine)
+            } else {
+                // Engine already exists; just (re-)attach the EventChannel sink
+                // hook if it isn't there. setStreamHandler replaces any prior.
+                attachEventChannel(engine)
+            }
+        }
+
+        private fun attachEventChannel(engine: FlutterEngine) {
+            EventChannel(engine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
+                .setStreamHandler(object : EventChannel.StreamHandler {
+                    override fun onListen(args: Any?, events: EventChannel.EventSink) {
+                        Log.d(TAG, "EventChannel onListen; draining ${pending.size} buffered")
+                        sink = events
+                        while (pending.isNotEmpty()) {
+                            try {
+                                events.success(pending.pollFirst())
+                            } catch (e: Exception) {
+                                Log.e(TAG, "drain failed: ${e.message}", e)
+                                break
+                            }
+                        }
+                    }
+
+                    override fun onCancel(args: Any?) {
+                        Log.d(TAG, "EventChannel onCancel")
+                        sink = null
+                    }
+                })
+        }
+
+        private fun dispatch(payload: Map<String, Any?>) {
+            val s = sink
+            if (s == null) {
+                // Dart hasn't subscribed yet (cold start). Buffer with drop-oldest.
+                if (pending.size >= MAX_PENDING) pending.removeFirst()
+                pending.addLast(payload)
+                Log.d(TAG, "sink null; buffered (size=${pending.size})")
+                return
+            }
+            try {
+                s.success(payload)
+            } catch (e: Exception) {
+                Log.e(TAG, "sink.success failed: ${e.message}", e)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "listener service onCreate")
-        mainHandler.post { ensureEngine() }
+        mainHandler.post { ensureEngine(applicationContext) }
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.d(TAG, "listener connected")
         // Ensure engine is up even if onCreate hadn't run yet (rare).
-        mainHandler.post { ensureEngine() }
+        mainHandler.post { ensureEngine(applicationContext) }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -79,20 +201,8 @@ class MessageNotificationListener : NotificationListenerService() {
             return
         }
 
-        val now = System.currentTimeMillis()
-        // Prune stale entries opportunistically (cheap; ConcurrentHashMap-safe).
-        val it = seen.entries.iterator()
-        while (it.hasNext()) {
-            if (now - it.next().value > DEDUP_TTL_MS) it.remove()
-        }
-
         val dedupKey = "${sbn.key}:${body.hashCode()}"
-        val last = seen[dedupKey]
-        if (last != null && now - last < DEDUP_TTL_MS) {
-            Log.d(TAG, "dedup hit for $dedupKey, skipping")
-            return
-        }
-        seen[dedupKey] = now
+        if (!passesDedup(dedupKey)) return
 
         val payload = mapOf(
             "packageName" to pkg,
@@ -123,73 +233,6 @@ class MessageNotificationListener : NotificationListenerService() {
             "key" to sbnKey,
         )
         mainHandler.post { dispatch(payload) }
-    }
-
-    private fun dispatch(payload: Map<String, Any?>) {
-        val s = sink
-        if (s == null) {
-            // Dart hasn't subscribed yet (cold start). Buffer with drop-oldest.
-            if (pending.size >= MAX_PENDING) pending.removeFirst()
-            pending.addLast(payload)
-            Log.d(TAG, "sink null; buffered (size=${pending.size})")
-            return
-        }
-        try {
-            s.success(payload)
-        } catch (e: Exception) {
-            Log.e(TAG, "sink.success failed: ${e.message}", e)
-        }
-    }
-
-    private fun ensureEngine() {
-        val cache = FlutterEngineCache.getInstance()
-        var engine = cache.get(ENGINE_ID)
-        if (engine == null) {
-            Log.d(TAG, "creating cached FlutterEngine")
-            engine = FlutterEngine(applicationContext)
-            // Register all Flutter plugins before executing the entrypoint
-            // so that platform channels (e.g. another_telephony, shared_preferences,
-            // permission_handler) are wired up when Dart starts.
-            GeneratedPluginRegistrant.registerWith(engine)
-            engine.dartExecutor.executeDartEntrypoint(
-                DartExecutor.DartEntrypoint.createDefault()
-            )
-            cache.put(ENGINE_ID, engine)
-            // Wire shared channels (both telephony and notifications/control)
-            // exactly once on engine creation, so they exist even when no
-            // Activity has attached.
-            MainActivity.registerChannels(engine, applicationContext)
-            NotificationControlChannel.register(engine, applicationContext)
-            SmsSenderChannel.register(engine, applicationContext)
-            attachEventChannel(engine)
-        } else {
-            // Engine already exists; just (re-)attach the EventChannel sink
-            // hook if it isn't there. setStreamHandler replaces any prior.
-            attachEventChannel(engine)
-        }
-    }
-
-    private fun attachEventChannel(engine: FlutterEngine) {
-        EventChannel(engine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
-            .setStreamHandler(object : EventChannel.StreamHandler {
-                override fun onListen(args: Any?, events: EventChannel.EventSink) {
-                    Log.d(TAG, "EventChannel onListen; draining ${pending.size} buffered")
-                    sink = events
-                    while (pending.isNotEmpty()) {
-                        try {
-                            events.success(pending.pollFirst())
-                        } catch (e: Exception) {
-                            Log.e(TAG, "drain failed: ${e.message}", e)
-                            break
-                        }
-                    }
-                }
-
-                override fun onCancel(args: Any?) {
-                    Log.d(TAG, "EventChannel onCancel")
-                    sink = null
-                }
-            })
     }
 
     private fun extract(n: Notification): Pair<String, String>? {

@@ -155,6 +155,14 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
       if (!phone.isGranted) {
         await Permission.phone.request();
       }
+      // RECEIVE_SMS (for the SmsReceiver intake) and SEND_SMS (for forwarding)
+      // are dangerous permissions in the SMS group and must be granted at
+      // runtime. Tolerant of denial — the notification-listener path still
+      // works without it.
+      final sms = await Permission.sms.status;
+      if (!sms.isGranted) {
+        await Permission.sms.request();
+      }
       final numbers = await TelephonyBridge.instance.getOwnPhoneNumbers();
       if (!mounted) return;
       setState(() {

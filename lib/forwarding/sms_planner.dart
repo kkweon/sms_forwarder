@@ -1,5 +1,6 @@
 import '../notifications/incoming_message.dart';
 import '../settings/app_state.dart';
+import '../settings/forward_dedup_cache.dart';
 import 'command.dart';
 import 'sms_utils.dart';
 
@@ -34,10 +35,26 @@ Command planForSms(IncomingMessage msg, AppState state, {DateTime? now}) {
     );
   }
 
+  // Drop destinations this exact body was already forwarded to within the
+  // dedup TTL (cross-source + cross-restart). The handler's synchronous
+  // ForwardReservation closes the remaining in-process race.
+  final remaining = state.destinationNumbers
+      .where(
+        (d) => !state.recentForwardDedupKeys.contains(
+          ForwardDedupCache.keyFor(msg.body ?? '', d),
+        ),
+      )
+      .toList();
+  if (remaining.isEmpty) {
+    return const NoActionCommand(
+      'already forwarded this message to all destinations, skipping',
+    );
+  }
+
   return ForwardCommand(
     message: msg,
-    destinations: state.destinationNumbers,
+    destinations: remaining,
     attemptTimestampMs: nowMs,
-    log: 'forwarding to ${state.destinationNumbers}',
+    log: 'forwarding to $remaining',
   );
 }

@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:another_telephony/telephony.dart' show SendStatus;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sms_forwarder/forwarding/forward_reservation.dart';
 import 'package:sms_forwarder/notifications/incoming_message.dart';
 import 'package:sms_forwarder/notifications/notification_dispatcher.dart';
 
@@ -14,6 +16,8 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    // Reset the process-wide reservation map between tests.
+    ForwardReservation.reset();
     ctrl = StreamController<IncomingMessage>.broadcast();
     fakeSms = FakeSmsService();
     dispatcher = NotificationDispatcher(
@@ -119,5 +123,58 @@ void main() {
     await prefs.reload();
     expect(prefs.getBool('forwarding_enabled'), isFalse);
     expect(prefs.getBool('loop_detected'), isTrue);
+  });
+
+  group('forward dedup (hybrid double-source)', () {
+    test('same code fired twice in quick succession forwards once per '
+        'destination (synchronous reservation)', () async {
+      SharedPreferences.setMockInitialValues({
+        'forwarding_enabled': true,
+        'destination_numbers': ['+12025550123', '+19998887777'],
+      });
+
+      // Two sources (SmsReceiver + Messages notification) deliver the SAME
+      // code nearly simultaneously, before either persists its dedup record.
+      ctrl.add(code('Your verification code is 123456'));
+      ctrl.add(code('Your verification code is 123456'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(fakeSms.sent.length, 2); // not 4
+      expect(fakeSms.sent.map((s) => s.to).toSet(), {
+        '+12025550123',
+        '+19998887777',
+      });
+    });
+
+    test('a repeated identical code is deduped on a later event', () async {
+      SharedPreferences.setMockInitialValues({
+        'forwarding_enabled': true,
+        'destination_numbers': ['+12025550123'],
+      });
+
+      await pumpEvent(code('Your verification code is 123456'));
+      expect(fakeSms.sent.length, 1);
+
+      fakeSms = FakeSmsService();
+      await pumpEvent(code('Your verification code is 123456'));
+      expect(fakeSms.sent, isEmpty); // blocked by cache + reservation
+    });
+
+    test('a failed send is not deduped, so a later attempt retries', () async {
+      SharedPreferences.setMockInitialValues({
+        'forwarding_enabled': true,
+        'destination_numbers': ['+12025550123'],
+      });
+
+      // First attempt fails (DELIVERED maps to 'failed' in forwardSms).
+      fakeSms = FakeSmsService(statusToReport: SendStatus.DELIVERED);
+      await pumpEvent(code('Your verification code is 123456'));
+      expect(fakeSms.sent.length, 1);
+
+      // A later attempt for the same code must NOT be blocked.
+      fakeSms = FakeSmsService();
+      await pumpEvent(code('Your verification code is 123456'));
+      expect(fakeSms.sent.length, 1);
+    });
   });
 }
