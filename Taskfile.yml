@@ -4,6 +4,7 @@ version: '3'
 
 vars:
   APK_DIR: build/app/outputs/flutter-apk
+  PKG: dev.kkweon.sms_forwarder
 
 tasks:
   default:
@@ -41,8 +42,32 @@ tasks:
         --split-per-abi --release --build-name={{.NAME}} --build-number={{.CODE}}{{end}}
 
   install:
-    desc: 'Install a release APK. Vars: DEVICE=<id> ABI=<armeabi-v7a|arm64-v8a|x86_64>'
+    # `adb install -r`, not `flutter install`: the latter uninstalls first,
+    # which wipes destination numbers, the forwarding toggle, and the
+    # notification-listener grant on every install.
+    desc: 'Install a release APK in place, keeping app data. Vars: DEVICE=<id> ABI=<armeabi-v7a|arm64-v8a|x86_64>'
     vars:
       ABI: '{{.ABI | default "arm64-v8a"}}'
     cmds:
-      - flutter install {{if .DEVICE}}--device-id {{.DEVICE}} {{end}}--use-application-binary={{.APK_DIR}}/app-{{.ABI}}-release.apk
+      - adb {{if .DEVICE}}-s {{.DEVICE}} {{end}}install -r {{.APK_DIR}}/app-{{.ABI}}-release.apk
+
+  install:clean:
+    # For testing first-run behavior or clearing corrupt state. Everything
+    # device-side goes: settings, granted permissions, and the
+    # notification-listener grant.
+    desc: 'WIPE then install — clears settings, permissions, and listener access. Vars: DEVICE=<id> ABI=<...>'
+    vars:
+      ABI: '{{.ABI | default "arm64-v8a"}}'
+    cmds:
+      # Tolerate "not installed" so this works on a fresh device too.
+      - cmd: adb {{if .DEVICE}}-s {{.DEVICE}} {{end}}uninstall {{.PKG}}
+        ignore_error: true
+      - task: install
+        vars: {DEVICE: '{{.DEVICE}}', ABI: '{{.ABI}}'}
+      # A wipe also resets the RECEIVE_SENSITIVE_NOTIFICATIONS appop, so
+      # re-apply it rather than leaving RCS OTP bodies redacted.
+      - '{{.TASK_DIR}}/scripts/setup-device.sh {{.DEVICE}}'
+      - >-
+        echo "Clean install done. Re-enable notification access (Settings >
+        Notifications > Device & app notifications) and re-add destination
+        numbers."
