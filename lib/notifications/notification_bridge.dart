@@ -39,10 +39,29 @@ class NotificationBridge {
 
   Future<void> openSettings() => _control.invokeMethod<void>('openSettings');
 
+  /// Whether this app is allowed to post notifications at all — false when
+  /// POST_NOTIFICATIONS is denied or the test channel is turned off. When
+  /// false, [postTestNotification] cannot work.
+  Future<bool> areNotificationsEnabled() async {
+    final r = await _control.invokeMethod<bool>('areNotificationsEnabled');
+    return r ?? false;
+  }
+
+  /// Opens this app's notification settings page (not the listener-access
+  /// page that [openSettings] opens).
+  Future<void> openNotificationSettings() =>
+      _control.invokeMethod<void>('openNotificationSettings');
+
   /// Posts a real MessagingStyle notification from our own package so the
   /// end-to-end pipeline can be exercised on-device without sending an
   /// SMS. The listener bypasses the package whitelist just for this single
   /// post.
+  ///
+  /// Throws [PlatformException] with code [blockedErrorCode] when the post
+  /// would be silently dropped, so the caller never reports a false success.
   Future<void> postTestNotification() =>
       _control.invokeMethod<void>('postTestNotification');
+
+  /// Matches `NotificationControlChannel.ERROR_BLOCKED`.
+  static const blockedErrorCode = 'notifications_blocked';
 }

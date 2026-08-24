@@ -71,7 +71,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Notification access required'), findsOneWidget);
+      expect(find.text('Setup incomplete'), findsOneWidget);
+      expect(find.text('Notification access'), findsOneWidget);
       final switchWidget = tester.widget<Switch>(find.byType(Switch));
       expect(switchWidget.onChanged, isNull);
     });

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../forwarding/sms_utils.dart';
 import '../forwarding/telephony_bridge.dart';
 import '../logging/app_log.dart';
 import '../notifications/notification_bridge.dart';
+import '../permissions/app_permissions.dart';
 import '../settings/forward_event.dart';
 import '../settings/loop_detector.dart';
 import '../settings/settings_service.dart';
@@ -19,6 +20,7 @@ class SmsForwarderPage extends StatefulWidget {
     super.key,
     this.notificationAccessGrantedOverride,
     this.logger,
+    this.permissions = const PlatformAppPermissions(),
   });
 
   /// When non-null, overrides the platform notification-access check.
@@ -27,6 +29,9 @@ class SmsForwarderPage extends StatefulWidget {
 
   /// Injected [FileLogger] for production. Null in tests.
   final FileLogger? logger;
+
+  /// Runtime-permission seam; widget tests inject a fake.
+  final AppPermissions permissions;
 
   @override
   State<SmsForwarderPage> createState() => _SmsForwarderPageState();
@@ -42,7 +47,27 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
   List<String> _destinationNumbers = [];
   List<String> _ownNumbers = [];
   List<ForwardEvent> _forwardEvents = [];
+  Map<AppPermission, PermissionState> _permissionStates = const {};
   final _phoneController = TextEditingController();
+
+  AppPermissions get _permissions => widget.permissions;
+
+  /// True only when nothing stands between an incoming code and a forward.
+  bool get _setupComplete =>
+      _notificationAccessGranted && _missingPermissions.isEmpty;
+
+  /// Permissions the user still has to act on, in declaration order.
+  ///
+  /// Unknown (not checked yet) and [PermissionState.unavailable] are both
+  /// excluded: neither is the user's doing, and both resolve on their own, so
+  /// neither should flash a banner asking them to fix something.
+  List<AppPermission> get _missingPermissions =>
+      AppPermission.values.where((p) {
+        final state = _permissionStates[p];
+        return state != null &&
+            !state.isGranted &&
+            state != PermissionState.unavailable;
+      }).toList();
 
   @override
   void initState() {
@@ -56,12 +81,16 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
     if (state == AppLifecycleState.resumed) {
       _checkNotificationAccess();
       _loadSettings(reload: true);
+      // Catches permissions granted in system settings while we were
+      // backgrounded, and retries any request that had no activity to run on.
+      _refreshPermissions();
     }
   }
 
   Future<void> _init() async {
     await _checkNotificationAccess();
     await _loadSettings();
+    await _ensurePermissions();
     await _loadOwnNumbers();
     await _maybeShowMigrationDialog();
   }
@@ -143,26 +172,63 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
     );
   }
 
+  /// Prompts for every not-yet-granted permission, one at a time.
+  ///
+  /// Each permission is handled independently: on a cold start a request can
+  /// come back [PermissionState.unavailable] because the Android activity has
+  /// not attached yet, and one shared failure must not swallow the requests
+  /// that follow it. Anything unavailable is retried on the next resume,
+  /// while an outright denial is left alone — the user answered, and the
+  /// banner in the UI is how they change their mind.
+  Future<void> _ensurePermissions() async {
+    final states = <AppPermission, PermissionState>{};
+    for (final permission in AppPermission.values) {
+      var state = await _permissions.check(permission);
+      if (state == PermissionState.denied) {
+        state = await _permissions.request(permission);
+        appLog('[PERM] ${permission.name} -> ${state.name}');
+      }
+      states[permission] = state;
+    }
+    if (!mounted) return;
+    setState(() => _permissionStates = states);
+  }
+
+  /// Re-reads permission states without prompting, and retries anything that
+  /// was [PermissionState.unavailable] now that an activity is attached.
+  Future<void> _refreshPermissions() async {
+    final states = <AppPermission, PermissionState>{};
+    var retryable = false;
+    for (final permission in AppPermission.values) {
+      final state = await _permissions.check(permission);
+      states[permission] = state;
+      if (state == PermissionState.unavailable) retryable = true;
+    }
+    if (!mounted) return;
+    setState(() => _permissionStates = states);
+    if (retryable) await _ensurePermissions();
+  }
+
+  /// Grant button on the banner: prompt, or send the user to app settings
+  /// when Android has locked the choice in and a prompt would do nothing.
+  Future<void> _grantPermission(AppPermission permission) async {
+    if (_permissionStates[permission]?.needsSettings ?? false) {
+      await _permissions.openAppSettings();
+      return;
+    }
+    final state = await _permissions.request(permission);
+    appLog('[PERM] ${permission.name} (user tap) -> ${state.name}');
+    if (!mounted) return;
+    setState(
+      () => _permissionStates = {..._permissionStates, permission: state},
+    );
+  }
+
   Future<void> _loadOwnNumbers() async {
     if (widget.notificationAccessGrantedOverride != null) {
       return; // skip in tests
     }
     try {
-      // Phone permission is required by TelephonyManager.line1Number on
-      // newer Android. Request once; user can deny without breaking core
-      // functionality (own-number dedup just won't work).
-      final phone = await Permission.phone.status;
-      if (!phone.isGranted) {
-        await Permission.phone.request();
-      }
-      // RECEIVE_SMS (for the SmsReceiver intake) and SEND_SMS (for forwarding)
-      // are dangerous permissions in the SMS group and must be granted at
-      // runtime. Tolerant of denial — the notification-listener path still
-      // works without it.
-      final sms = await Permission.sms.status;
-      if (!sms.isGranted) {
-        await Permission.sms.request();
-      }
       final numbers = await TelephonyBridge.instance.getOwnPhoneNumbers();
       if (!mounted) return;
       setState(() {
@@ -230,18 +296,62 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
   }
 
   Future<void> _postTestNotification() async {
+    // Ask before posting: a denied POST_NOTIFICATIONS makes the platform drop
+    // the notification without raising anything, which looks like a dead
+    // button. Prompting here (rather than only at startup) is what makes the
+    // button self-healing if the permission was denied earlier.
+    var state = await _permissions.check(AppPermission.notifications);
+    if (state == PermissionState.denied) {
+      state = await _permissions.request(AppPermission.notifications);
+    }
+    if (mounted) {
+      setState(
+        () => _permissionStates = {
+          ..._permissionStates,
+          AppPermission.notifications: state,
+        },
+      );
+    }
+    if (state.needsSettings) {
+      if (!mounted) return;
+      _showBlockedSnackBar('Notifications are turned off for SMS Forwarder.');
+      return;
+    }
     try {
       await NotificationBridge.instance.postTestNotification();
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Test notification posted')));
+    } on PlatformException catch (e) {
+      appLog('[NL] test notification blocked: ${e.code} ${e.message}');
+      if (!mounted) return;
+      if (e.code == NotificationBridge.blockedErrorCode) {
+        _showBlockedSnackBar(e.message ?? 'Notifications are turned off.');
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Test failed: ${e.message}')));
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Test failed: $e')));
     }
+  }
+
+  void _showBlockedSnackBar(String reason) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$reason The test cannot run until it is enabled.'),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: NotificationBridge.instance.openNotificationSettings,
+        ),
+      ),
+    );
   }
 
   @override
@@ -300,27 +410,48 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                 ),
               ),
             ),
+          // One status card for the whole setup. It goes green only when
+          // notification access AND every runtime permission is in place —
+          // a green check while SMS permission is denied would be a lie.
           Card(
-            child: ListTile(
-              leading: Icon(
-                _notificationAccessGranted ? Icons.check_circle : Icons.error,
-                color: _notificationAccessGranted ? Colors.green : Colors.red,
-              ),
-              title: Text(
-                _notificationAccessGranted
-                    ? 'Notification access granted'
-                    : 'Notification access required',
-              ),
-              subtitle: const Text(
-                'Reads Google Messages notifications to forward both SMS and RCS verification codes.',
-              ),
-              trailing: _notificationAccessGranted
-                  ? null
-                  : ElevatedButton(
-                      onPressed: () =>
-                          NotificationBridge.instance.openSettings(),
-                      child: const Text('Grant'),
-                    ),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Icon(
+                    _setupComplete ? Icons.check_circle : Icons.error,
+                    color: _setupComplete ? Colors.green : Colors.red,
+                  ),
+                  title: Text(
+                    _setupComplete ? 'Ready to forward' : 'Setup incomplete',
+                  ),
+                  subtitle: Text(
+                    _setupComplete
+                        ? 'Notification access and all permissions granted.'
+                        : 'Forwarding will not work until the items below are '
+                              'granted.',
+                  ),
+                ),
+                if (!_notificationAccessGranted)
+                  _SetupItem(
+                    label: 'Notification access',
+                    rationale:
+                        'Reads Google Messages notifications to forward both '
+                        'SMS and RCS verification codes.',
+                    buttonLabel: 'Grant',
+                    onPressed: NotificationBridge.instance.openSettings,
+                  ),
+                for (final permission in _missingPermissions)
+                  _SetupItem(
+                    label: permission.label,
+                    rationale: permission.rationale,
+                    // A prompt is a no-op once Android locks the choice in,
+                    // so send the user where the choice can still be changed.
+                    buttonLabel: _permissionStates[permission]!.needsSettings
+                        ? 'Settings'
+                        : 'Grant',
+                    onPressed: () => _grantPermission(permission),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -477,6 +608,32 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One outstanding setup item inside the status card: what is missing, why it
+/// is needed, and the button that fixes it.
+class _SetupItem extends StatelessWidget {
+  const _SetupItem({
+    required this.label,
+    required this.rationale,
+    required this.buttonLabel,
+    required this.onPressed,
+  });
+
+  final String label;
+  final String rationale;
+  final String buttonLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.remove_circle_outline, color: Colors.red),
+      title: Text(label),
+      subtitle: Text(rationale),
+      trailing: ElevatedButton(onPressed: onPressed, child: Text(buttonLabel)),
     );
   }
 }

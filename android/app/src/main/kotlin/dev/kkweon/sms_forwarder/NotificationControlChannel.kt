@@ -25,18 +25,31 @@ object NotificationControlChannel {
     private const val TEST_CHANNEL_ID = "sms_forwarder_test_notifications"
     private const val TEST_NOTIFICATION_ID = 4242
 
+    /** MethodChannel error code Dart matches on to offer "Open settings". */
+    const val ERROR_BLOCKED = "notifications_blocked"
+
     fun register(engine: FlutterEngine, context: Context) {
         MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "isAccessGranted" -> result.success(isAccessGranted(context))
+                    "areNotificationsEnabled" ->
+                        result.success(notificationsBlockedReason(context) == null)
                     "openSettings" -> {
                         openSettings(context)
                         result.success(null)
                     }
-                    "postTestNotification" -> {
-                        postTestNotification(context)
+                    "openNotificationSettings" -> {
+                        openNotificationSettings(context)
                         result.success(null)
+                    }
+                    "postTestNotification" -> {
+                        val blocked = postTestNotification(context)
+                        if (blocked == null) {
+                            result.success(null)
+                        } else {
+                            result.error(ERROR_BLOCKED, blocked, null)
+                        }
                     }
                     else -> result.notImplemented()
                 }
@@ -56,9 +69,44 @@ object NotificationControlChannel {
         context.startActivity(intent)
     }
 
-    private fun postTestNotification(context: Context) {
-        Log.d(TAG, "postTestNotification: posting synthetic MessagingStyle notification")
+    private fun openNotificationSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+
+    /**
+     * Returns a human-readable reason why a notification we post would be
+     * dropped, or null if it would go through.
+     *
+     * Both cases below make [NotificationManagerCompat.notify] a SILENT no-op
+     * on Android 13+ — it does not throw — so without this check the caller
+     * reports a success that never happened.
+     */
+    private fun notificationsBlockedReason(context: Context): String? {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            return "Notifications are turned off for SMS Forwarder " +
+                "(the POST_NOTIFICATIONS permission is denied)."
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val mgr = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val ch = mgr.getNotificationChannel(TEST_CHANNEL_ID)
+            if (ch != null && ch.importance == NotificationManager.IMPORTANCE_NONE) {
+                return "The \"SMS Forwarder test notifications\" channel is turned off."
+            }
+        }
+        return null
+    }
+
+    /** Posts the synthetic OTP. Returns null on success, or the block reason. */
+    private fun postTestNotification(context: Context): String? {
         ensureTestChannel(context)
+        notificationsBlockedReason(context)?.let {
+            Log.w(TAG, "postTestNotification: blocked — $it")
+            return it
+        }
+        Log.d(TAG, "postTestNotification: posting synthetic MessagingStyle notification")
         @Suppress("DEPRECATION")
         val style = NotificationCompat.MessagingStyle("Self")
             .addMessage(
@@ -81,12 +129,15 @@ object NotificationControlChannel {
                 .notify(TEST_NOTIFICATION_ID, n)
         } catch (e: SecurityException) {
             Log.e(TAG, "postTestNotification: missing POST_NOTIFICATIONS?: ${e.message}", e)
+            MessageNotificationListener.allowSelfPackage = false
+            return "Android refused the post: ${e.message}"
         }
         // Re-disable the bypass shortly after; the listener will have
         // already processed the post by then.
         Handler(Looper.getMainLooper()).postDelayed({
             MessageNotificationListener.allowSelfPackage = false
         }, 1500)
+        return null
     }
 
     private fun ensureTestChannel(context: Context) {
