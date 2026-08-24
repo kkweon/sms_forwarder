@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="SMS Forwarder">
+  <title>SMS Forwarder</title>
+  <!-- Master logo. Geometry lives here only; scripts/render_icons.py derives
+       every Android launcher asset from this file. The mark's bounding box is
+       x 123..903, y 277..747 (stroke included), centred on the 1024 canvas. -->
+  <rect id="bg" width="1024" height="1024" fill="#FFFFFF"/>
+  <g class="mark" fill="none" stroke="#000000" stroke-width="46" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Envelope body: one open stroke running from the gap in the right edge
+         counter-clockwise back to it, so the arrow shaft passes through the
+         edge instead of crossing it. -->
+    <path d="M700 452 V326 A26 26 0 0 0 674 300 H172 A26 26 0 0 0 146 326 V698 A26 26 0 0 0 172 724 H674 A26 26 0 0 0 700 698 V572"/>
+    <!-- Flap -->
+    <path d="M160 306 L423 550 L686 306"/>
+    <!-- Forward arrow -->
+    <path d="M610 512 H880"/>
+    <path d="M796 428 L880 512 L796 596"/>
+  </g>
+</svg>

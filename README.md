@@ -108,6 +108,29 @@ task fix     # auto-fix lints + format (run before committing so the hook passes
 task test    # flutter test
 ```
 
+## App icon
+
+The launcher icon is a single vector master at
+[`assets/logo/sms_forwarder_logo.svg`](assets/logo/sms_forwarder_logo.svg) — a
+black outline envelope whose forward arrow pierces its right edge, on white.
+
+Two things are derived from it, and neither should be edited by hand:
+
+- **Adaptive icon (API 26+)** — `res/drawable/ic_launcher_foreground.xml` holds
+  the same paths as an Android vector drawable, scaled to 0.78 so the mark stays
+  inside the 66dp safe zone. It also serves as the `<monochrome>` layer, so
+  Android 13+ themed icons work. The background is a flat white colour resource.
+- **Legacy PNG mipmaps** — square and round, five densities, rendered from the
+  SVG:
+
+```bash
+pip install cairosvg
+task icons   # or: python3 scripts/render_icons.py
+```
+
+If you change the geometry in the SVG, mirror it into the vector drawable's
+`pathData` and re-run the render script.
+
 ## Smoke-testing on a real device
 
 Because intake is now notification-based, the easiest end-to-end test is the in-app **"Post test notification"** button (the test-tube icon in the AppBar). It posts a real `MessagingStyle` notification carrying `"Your verification code is 451287"` from our own package; the listener bypasses its Google-Messages whitelist for this single post and the rest of the pipeline runs unchanged.

@@ -29,6 +29,13 @@ tasks:
     cmds:
       - flutter test
 
+  icons:
+    # Regenerates only the legacy PNG mipmaps; the adaptive icon is a vector
+    # drawable checked in alongside the SVG master.
+    desc: Re-render launcher PNGs from assets/logo/sms_forwarder_logo.svg (needs `pip install cairosvg`)
+    cmds:
+      - python3 scripts/render_icons.py
+
   build:
     desc: 'Build APK — release w/ datetime version by default; pass `-- --debug` for a debug APK'
     vars:

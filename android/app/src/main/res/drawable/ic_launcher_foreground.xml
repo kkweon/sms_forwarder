@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from assets/logo/sms_forwarder_logo.svg. Edit the SVG, not this. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <!-- 0.78 keeps the mark inside the 66dp adaptive-icon safe zone. -->
+    <group
+        android:pivotX="512"
+        android:pivotY="512"
+        android:scaleX="0.78"
+        android:scaleY="0.78">
+        <path
+            android:pathData="M700,452 V326 A26,26 0 0 0 674,300 H172 A26,26 0 0 0 146,326 V698 A26,26 0 0 0 172,724 H674 A26,26 0 0 0 700,698 V572"
+            android:strokeColor="#000000"
+            android:strokeWidth="46"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M160,306 L423,550 L686,306"
+            android:strokeColor="#000000"
+            android:strokeWidth="46"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M610,512 H880"
+            android:strokeColor="#000000"
+            android:strokeWidth="46"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M796,428 L880,512 L796,596"
+            android:strokeColor="#000000"
+            android:strokeWidth="46"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>
