@@ -491,8 +491,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                   const Text(
                     'Matches if one of these phrases appears together with a '
                     '4–8 character code containing a digit (case-insensitive). '
-                    'A bare "code" or "PIN" only counts next to the code '
-                    'itself, so "zip code" style messages are not forwarded.',
+                    'A bare "code" or "PIN" only counts when the code sits '
+                    'right next to it, so "Order confirmed! #38221" is '
+                    'skipped. An unrelated number right after the word — '
+                    '"zip code 94107" — is still forwarded.',
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],

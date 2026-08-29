@@ -53,8 +53,14 @@ final _strongPhrase = RegExp(
   caseSensitive: false,
 );
 
-/// Words too common to stand alone ("zip code 94107", "Order confirmed!
-/// #38221"). They only count when a [_codeToken] sits right beside them.
+/// Words too common to stand alone ("Order confirmed! #38221", "the door
+/// code? I think it's 4821"). They only count when a [_codeToken] sits right
+/// beside them.
+///
+/// Proximity separates them from a real OTP only when the number is some
+/// distance away. A non-OTP number that happens to be adjacent ("zip code
+/// 94107", "Error code 0x80") still matches — see the known-limitation
+/// group in `test/sms_utils_test.dart`.
 final _weakKeyword = RegExp(r'\b(?:pins?|codes?)\b', caseSensitive: false);
 
 /// Gap allowed between a [_weakKeyword] and its code, in characters.
