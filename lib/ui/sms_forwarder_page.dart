@@ -489,7 +489,10 @@ class _SmsForwarderPageState extends State<SmsForwarderPage>
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Matches if a keyword + 4–8 digit number are both present (case-insensitive)',
+                    'Matches if one of these phrases appears together with a '
+                    '4–8 character code containing a digit (case-insensitive). '
+                    'A bare "code" or "PIN" only counts next to the code '
+                    'itself, so "zip code" style messages are not forwarded.',
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
