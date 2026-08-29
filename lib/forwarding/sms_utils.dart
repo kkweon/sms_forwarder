@@ -19,6 +19,11 @@ String preprocessBody(String body) {
   return s.trim();
 }
 
+/// A plausible verification code: a 4-8 character run of letters and digits
+/// containing at least one digit. Alphanumeric codes (GEICO's `2ECB89`,
+/// Google's `G-123456`) are as common as all-digit ones, so both must match.
+final _codeToken = RegExp(r'\b(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{4,8}\b');
+
 bool containsVerificationCode(String text) {
   final cleaned = preprocessBody(text);
   if (cleaned.isEmpty) return false;
@@ -26,8 +31,8 @@ bool containsVerificationCode(String text) {
     keywords.join('|'),
     caseSensitive: false,
   ).hasMatch(cleaned);
-  final hasDigits = RegExp(r'\b\d{4,8}\b').hasMatch(cleaned);
-  return hasKeyword && hasDigits;
+  final hasCode = _codeToken.hasMatch(cleaned);
+  return hasKeyword && hasCode;
 }
 
 String formatTime(String iso) {

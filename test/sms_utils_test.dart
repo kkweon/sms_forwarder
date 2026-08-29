@@ -95,7 +95,16 @@ void main() {
       expect(containsVerificationCode('Call me at 1234567'), isFalse);
     });
 
-    test('rejects messages with keyword but no 4-8 digit number', () {
+    test('matches alphanumeric codes', () {
+      expect(
+        containsVerificationCode('Your verification code is: 2ECB89'),
+        isTrue,
+      );
+      expect(containsVerificationCode('Your code is A1B2C3'), isTrue);
+      expect(containsVerificationCode('G-123456 is your Google code'), isTrue);
+    });
+
+    test('rejects messages with keyword but no code token', () {
       expect(containsVerificationCode('Please verify your email'), isFalse);
       expect(containsVerificationCode('Enter your code'), isFalse);
       expect(containsVerificationCode('Auth required'), isFalse);
@@ -108,6 +117,22 @@ void main() {
     test('rejects digit sequences outside 4-8 range', () {
       expect(containsVerificationCode('Your code is 123'), isFalse);
       expect(containsVerificationCode('Your code is 123456789'), isFalse);
+    });
+
+    test('matches GEICO alphanumeric code message (regression)', () {
+      expect(
+        containsVerificationCode(
+          'GEICO: Your verification code is: 2ECB89. It expires in 10 '
+          'minutes. Please do not share this code with anyone or reply to '
+          'this message.',
+        ),
+        isTrue,
+      );
+    });
+
+    test('rejects alphanumeric tokens outside 4-8 range', () {
+      expect(containsVerificationCode('Your code is A1B'), isFalse);
+      expect(containsVerificationCode('Your code is A1B2C3D4E5'), isFalse);
     });
 
     test('matches BofA SMS Retriever format message (regression)', () {
