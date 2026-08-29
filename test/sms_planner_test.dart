@@ -148,4 +148,21 @@ void main() {
       expect(cmd, isA<ForwardCommand>());
     });
   });
+
+  group('planForSms — real-world message regressions', () {
+    test('GEICO alphanumeric code reaches ForwardCommand', () {
+      final cmd = planForSms(
+        _msg(
+          address: '94067',
+          body:
+              'GEICO: Your verification code is: 2ECB89. It expires in 10 '
+              'minutes. Please do not share this code with anyone or reply '
+              'to this message.',
+        ),
+        _state(),
+        now: now,
+      );
+      expect(cmd, isA<ForwardCommand>(), reason: 'log was: ${cmd.log}');
+    });
+  });
 }
